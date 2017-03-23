@@ -42,6 +42,8 @@ import (
 	"github.com/cloudwan/gohan/db/sql"
 	_ "github.com/cloudwan/gohan/extension/gohanscript/autogen"
 	l "github.com/cloudwan/gohan/log"
+
+	"github.com/flosch/pongo2"
 )
 
 var log = l.NewLogger()
@@ -614,7 +616,6 @@ func getGenerateCommand() cli.Command {
 
 func gohanGenerate(c *cli.Context) {
 	path := c.String("output")
-	template := c.String("template")
 	configFile := c.String("config-file")
 	packageName := c.String("package")
 	codeDir := filepath.Join(path, packageName)
@@ -672,9 +673,73 @@ func gohanGenerate(c *cli.Context) {
 
 	//Generating application code
 	log.Info("Generating: application code")
-	execCommand(
-		fmt.Sprintf(
-			"gohan template --config-file %s --template %s | grep -v '^\\s*$' > %s/base_controller.go", configFile, template, packageName))
+
+	templates, _ := config.GetParam("code_templates", nil).([]interface{})
+	if templates != nil {
+		for _, rawTemplateConfig := range templates {
+			templateConfig, ok := rawTemplateConfig.(map[string]interface{})
+			if !ok {
+				util.ExitFatal("malformed code_templates")
+				return
+			}
+			templateFile, ok := templateConfig["template"].(string)
+			if !ok {
+				util.ExitFatal("malformed code_template. template should be string")
+				return
+			}
+			outputPath, ok := templateConfig["output"].(string)
+			if !ok {
+				util.ExitFatal("malformed code_templates. template should be string")
+				return
+			}
+			filePerSchema, ok := templateConfig["file_per_schema"].(bool)
+			if !ok {
+				util.ExitFatal("malformed code_templates. template should be string")
+				return
+			}
+			templateCode, err := util.GetContent(templateFile)
+			if err != nil {
+				util.ExitFatal(err)
+				return
+			}
+			tpl, err := pongo2.FromString(string(templateCode))
+			if err != nil {
+				util.ExitFatal(err)
+				return
+			}
+			if filePerSchema {
+				outputPathTemplate, err := pongo2.FromString(outputPath)
+				if err != nil {
+					util.ExitFatal(err)
+					return
+				}
+				for _, s := range list {
+					outputPathName, err := outputPathTemplate.Execute(pongo2.Context{"schema": s})
+					if err != nil {
+						util.ExitFatal(err)
+						return
+					}
+					output, err := tpl.Execute(pongo2.Context{"schema": s})
+					if err != nil {
+						util.ExitFatal(err)
+						return
+					}
+					ioutil.WriteFile(filepath.Join(codeDir, outputPathName), []byte(output), os.ModePerm)
+				}
+			} else {
+				output, err := tpl.Execute(pongo2.Context{"schemas": list})
+				if err != nil {
+					util.ExitFatal(err)
+					return
+				}
+				ioutil.WriteFile(filepath.Join(codeDir, outputPath), []byte(output), os.ModePerm)
+			}
+		}
+	}
+
+	// execCommand(
+	// 	fmt.Sprintf(
+	// 		"gohan template --config-file %s --template %s | grep -v '^\\s*$' > %s/base_controller.go", configFile, template, packageName))
 	execCommand(
 		fmt.Sprintf(
 			"goimports -w %s/base_controller.go", codeDir))
