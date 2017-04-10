@@ -26,6 +26,11 @@ func NewSync() *Sync {
 	return &Sync{}
 }
 
+//GetProcessID returns processID
+func (sync *Sync) GetProcessID() string {
+	return ""
+}
+
 //Update sync update sync
 func (sync *Sync) Update(path, json string) error {
 	return nil

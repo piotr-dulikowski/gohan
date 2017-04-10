@@ -27,7 +27,10 @@ import (
 	"github.com/twinj/uuid"
 )
 
-const masterTTL = 10
+const (
+	processPath = "/gohan/cluster/process"
+	masterTTL = 10
+)
 
 //Sync is struct for etcd based sync
 type Sync struct {
@@ -43,6 +46,11 @@ func NewSync(etcdServers []string) *Sync {
 	hostname, _ := os.Hostname()
 	sync.processID = hostname + uuid.NewV4().String()
 	return sync
+}
+
+//GetProcessID returns processID
+func (s *Sync) GetProcessID() string {
+	return s.processID
 }
 
 //Update sync update sync

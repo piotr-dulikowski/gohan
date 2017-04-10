@@ -30,6 +30,7 @@ type Sync interface {
 	Update(path, json string) error
 	Delete(path string, prefix bool) error
 	Watch(path string, responseChan chan *Event, stopChan chan bool, revision int64) error
+	GetProcessID() string
 	Close()
 }
 

@@ -402,6 +402,7 @@ func (server *Server) Router() http.Handler {
 func (server *Server) Stop() {
 	server.running = false
 	if server.sync != nil {
+		stopProcessWatchProcess(server)
 		stopSyncProcess(server)
 		stopStateWatchProcess(server)
 		stopSyncWatchProcess(server)
@@ -449,9 +450,10 @@ func RunServer(configFile string) {
 	server.running = true
 
 	if server.sync != nil {
+		chProcessWatch := startProcessWatchProcess(server)
 		startSyncProcess(server)
 		startStateWatchProcess(server)
-		startSyncWatchProcess(server)
+		startSyncWatchProcess(server, chProcessWatch)
 	}
 	startAMQPProcess(server)
 	startSNMPProcess(server)
