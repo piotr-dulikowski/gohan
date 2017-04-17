@@ -16,6 +16,7 @@
 package etcdv3
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,12 +31,11 @@ import (
 	pb "github.com/coreos/etcd/mvcc/mvccpb"
 	cmap "github.com/streamrail/concurrent-map"
 	"github.com/twinj/uuid"
-	"golang.org/x/net/context"
 )
 
 const (
 	processPath = "/gohan/cluster/process"
-	masterTTL = 10
+	masterTTL   = 10
 )
 
 //Sync is struct for etcd based sync
@@ -320,6 +320,29 @@ func (s *Sync) Watch(path string, responseChan chan *sync.Event, stopChan chan b
 		wg.Wait()
 		return err
 	}
+}
+
+// WatchContext keep watch update under the path until context is canceled
+func (s *Sync) WatchContext(ctx context.Context, path string, revision int64) (<-chan *sync.Event, error) {
+	stopChan := make(chan bool)
+	go func() {
+		<-ctx.Done()
+		close(stopChan)
+	}()
+
+	responseChan := make(chan *sync.Event)
+
+	go func() {
+		defer close(responseChan)
+		err := s.Watch(path, responseChan, stopChan, revision)
+		if err != nil {
+			responseChan <- &sync.Event{
+				Err: err,
+			}
+		}
+	}()
+
+	return responseChan, nil
 }
 
 func (s *Sync) Close() {

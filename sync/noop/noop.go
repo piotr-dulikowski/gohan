@@ -15,7 +15,11 @@
 
 package noop
 
-import "github.com/cloudwan/gohan/sync"
+import (
+	"context"
+
+	"github.com/cloudwan/gohan/sync"
+)
 
 //Sync is struct for noop
 type Sync struct {
@@ -63,6 +67,11 @@ func (sync *Sync) Unlock(path string) error {
 //Watch keep watch update under the path
 func (sync *Sync) Watch(path string, responseChan chan *sync.Event, stopChan chan bool, revision int64) error {
 	return nil
+}
+
+//WatchContext keep watch update under the path until context is canceled
+func (sync *Sync) WatchContext(ctx context.Context, path string, revision int64) (<-chan *sync.Event, error) {
+	return nil, nil
 }
 
 func (sync *Sync) Close() {
