@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwan/gohan/schema"
 	"github.com/cloudwan/gohan/server/middleware"
 	gohan_sync "github.com/cloudwan/gohan/sync"
+	"github.com/rcrowley/go-metrics"
 )
 
 const (
@@ -130,6 +131,11 @@ func (watcher *stateWatcher) processEvent(event *gohan_sync.Event) {
 	}
 }
 
+func measureStateUpdateTime(timeStarted time.Time, event string, schemaId string) {
+	m := metrics.GetOrRegisterTimer(fmt.Sprintf("state.%s.%s", schemaId, event), metrics.DefaultRegistry)
+	m.UpdateSince(timeStarted)
+}
+
 //StateUpdate updates the state in the db based on the sync event
 func (watcher *stateWatcher) stateUpdate(event *gohan_sync.Event) error {
 	schemaPath := strings.TrimPrefix(event.Key, statePrefix)
@@ -138,6 +144,9 @@ func (watcher *stateWatcher) stateUpdate(event *gohan_sync.Event) error {
 		log.Debug("State update on unexpected path '%s'", schemaPath)
 		return nil
 	}
+
+	defer measureStateUpdateTime(time.Now(), "state_update", curSchema.ID)
+
 	resourceID := curSchema.GetResourceIDFromPath(schemaPath)
 	log.Info("Started StateUpdate for %s %s %v", event.Action, event.Key, event.Data)
 
@@ -193,7 +202,7 @@ func (watcher *stateWatcher) stateUpdate(event *gohan_sync.Event) error {
 		context["config_version"] = resourceState.ConfigVersion
 		context["transaction"] = tx
 
-		if err := extension.HandleEvent(context, environment, "pre_state_update_in_transaction"); err != nil {
+		if err := extension.HandleEvent(context, environment, "pre_state_update_in_transaction", curSchema.ID); err != nil {
 			return err
 		}
 	}
@@ -204,7 +213,7 @@ func (watcher *stateWatcher) stateUpdate(event *gohan_sync.Event) error {
 	}
 
 	if haveEnvironment {
-		if err := extension.HandleEvent(context, environment, "post_state_update_in_transaction"); err != nil {
+		if err := extension.HandleEvent(context, environment, "post_state_update_in_transaction", curSchema.ID); err != nil {
 			return err
 		}
 	}
@@ -220,6 +229,8 @@ func (watcher *stateWatcher) monitoringUpdate(event *gohan_sync.Event) error {
 		log.Debug("Monitoring update on unexpected path '%s'", schemaPath)
 		return nil
 	}
+	defer measureStateUpdateTime(time.Now(), "monitoring_update", curSchema.ID)
+
 	resourceID := curSchema.GetResourceIDFromPath(schemaPath)
 	log.Info("Started MonitoringUpdate for %s %s %v", event.Action, event.Key, event.Data)
 
@@ -269,7 +280,7 @@ func (watcher *stateWatcher) monitoringUpdate(event *gohan_sync.Event) error {
 	context["transaction"] = tx
 
 	if haveEnvironment {
-		if err := extension.HandleEvent(context, environment, "pre_monitoring_update_in_transaction"); err != nil {
+		if err := extension.HandleEvent(context, environment, "pre_monitoring_update_in_transaction", curSchema.ID); err != nil {
 			return err
 		}
 	}
@@ -280,7 +291,7 @@ func (watcher *stateWatcher) monitoringUpdate(event *gohan_sync.Event) error {
 	}
 
 	if haveEnvironment {
-		if err := extension.HandleEvent(context, environment, "post_monitoring_update_in_transaction"); err != nil {
+		if err := extension.HandleEvent(context, environment, "post_monitoring_update_in_transaction", curSchema.ID); err != nil {
 			return err
 		}
 	}

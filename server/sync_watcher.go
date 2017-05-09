@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rcrowley/go-metrics"
+
 	"github.com/cloudwan/gohan/extension"
 	"github.com/cloudwan/gohan/job"
 	gohan_sync "github.com/cloudwan/gohan/sync"
@@ -319,6 +321,7 @@ func (watcher *SyncWatcher) storeRevision(path string, revision int64) error {
 
 //Run extension on sync
 func runExtensionOnSync(response *gohan_sync.Event, env extension.Environment) {
+	defer measureSyncTime(time.Now(), response.Action)
 	context := map[string]interface{}{
 		"action": response.Action,
 		"data":   response.Data,
@@ -329,4 +332,9 @@ func runExtensionOnSync(response *gohan_sync.Event, env extension.Environment) {
 		return
 	}
 	return
+}
+
+func measureSyncTime(timeStarted time.Time, action string) {
+	m := metrics.GetOrRegisterTimer(fmt.Sprintf("sync.%s", action), metrics.DefaultRegistry)
+	m.UpdateSince(timeStarted)
 }

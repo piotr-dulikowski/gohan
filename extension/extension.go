@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwan/gohan/schema"
 	"github.com/cloudwan/gohan/singleton"
+	"github.com/rcrowley/go-metrics"
 )
 
 //Environment is a interface for extension environment
@@ -95,8 +96,14 @@ type Error struct {
 	ExceptionInfo map[string]interface{}
 }
 
+func measureExtensionTime(timeStarted time.Time, event string, schemaId string) {
+	m := metrics.GetOrRegisterTimer(fmt.Sprintf("ext.%s.%s", schemaId, event), metrics.DefaultRegistry)
+	m.UpdateSince(timeStarted)
+}
+
 //HandleEvent handles the event in the given environment
-func HandleEvent(context map[string]interface{}, environment Environment, event string) error {
+func HandleEvent(context map[string]interface{}, environment Environment, event string, schemaId string) error {
+	defer measureExtensionTime(time.Now(), event, schemaId)
 	if err := environment.HandleEvent(event, context); err != nil {
 		return err
 	}

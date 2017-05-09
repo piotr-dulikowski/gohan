@@ -19,18 +19,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"net"
-	"net/http"
-	"net/http/pprof"
-	"os"
-	"os/signal"
-	"path"
-	"path/filepath"
-	"regexp"
-	"strings"
-	"syscall"
-	"time"
-
 	"github.com/braintree/manners"
 	"github.com/cloudwan/gohan/db"
 	"github.com/cloudwan/gohan/db/migration"
@@ -43,10 +31,24 @@ import (
 	"github.com/cloudwan/gohan/sync"
 	sync_util "github.com/cloudwan/gohan/sync/util"
 	"github.com/cloudwan/gohan/util"
+	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/drone/routes"
 	"github.com/go-martini/martini"
 	"github.com/lestrrat/go-server-starter/listener"
 	"github.com/martini-contrib/staticbin"
+	"github.com/rcrowley/go-metrics"
+	"net"
+	"net/http"
+	"net/http/pprof"
+	"os"
+	"os/signal"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 )
 
 type tlsConfig struct {
@@ -69,6 +71,7 @@ type Server struct {
 
 	masterCtx       context.Context
 	masterCtxCancel context.CancelFunc
+	graphiteConfigs      []graphite.Config
 }
 
 func (server *Server) mapRoutes() {
@@ -185,6 +188,49 @@ func (server *Server) getDatabaseConfig() (string, string, bool, bool, bool) {
 	return databaseType, databaseConnection, databaseDropOnCreate, databaseCascade, databaseAutoMigrate
 }
 
+func getGraphitePercentiles(config *util.Config) (percentiles []float64, err error) {
+	defaultPercentiles := []string{"0.5", "0.75", "0.95", "0.99", "0.999"}
+	percentilesStr := config.GetStringList("metrics/graphite/percentiles", defaultPercentiles)
+	percentiles = make([]float64, len(percentilesStr))
+	for i, v := range percentilesStr {
+		if percentiles[i], err = strconv.ParseFloat(v, 64); err != nil {
+			return nil, fmt.Errorf("Error '%s' when parsing metrics/graphite/percentiles, expecting a float, '%s' given", err, v)
+		}
+	}
+
+	return percentiles, nil
+}
+
+func getGraphiteConfig(config *util.Config) (graphiteConfigs []graphite.Config, err error) {
+	graphiteEndpoints := config.GetStringList("metrics/graphite/endpoints", []string{})
+	if len(graphiteEndpoints) == 0 {
+		log.Debug("No graphite endpoints set in config file")
+		return graphiteConfigs, nil
+	}
+
+	var baseconfig graphite.Config
+
+	if baseconfig.Percentiles, err = getGraphitePercentiles(config); err != nil {
+		return nil, err
+	}
+	baseconfig.FlushInterval = time.Duration(config.GetInt("metrics/graphite/flush_interval_sec", 60)) * time.Second
+	baseconfig.Prefix = config.GetString("metrics/graphite/prefix", "gohan")
+	baseconfig.DurationUnit = time.Nanosecond
+	baseconfig.Registry = metrics.DefaultRegistry
+
+	for _, endpoint := range graphiteEndpoints {
+		addr, err := net.ResolveTCPAddr("tcp", endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("Can't resolve graphite endpoint %s: %s", endpoint, err)
+		}
+		config := baseconfig
+		config.Addr = addr
+		graphiteConfigs = append(graphiteConfigs, config)
+	}
+
+	return graphiteConfigs, nil
+}
+
 //NewServer returns new GohanAPIServer
 func NewServer(configFile string) (*Server, error) {
 	manager := schema.GetManager()
@@ -278,6 +324,10 @@ func NewServer(configFile string) (*Server, error) {
 
 	if !config.GetBool("database/no_init", false) {
 		server.initDB()
+	}
+
+	if server.graphiteConfigs, err = getGraphiteConfig(config); err != nil {
+		return nil, err
 	}
 
 	if config.GetList("database/initial_data", nil) != nil {
@@ -511,6 +561,7 @@ func RunServer(configFile string) {
 	startAMQPProcess(server)
 	startSNMPProcess(server)
 	startCRONProcess(server)
+	startMetricsProcess(server)
 	err = server.Start()
 	if err != nil {
 		log.Fatal(err)
