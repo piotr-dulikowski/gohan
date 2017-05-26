@@ -16,13 +16,15 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/cloudwan/gohan/db"
 	"github.com/cloudwan/gohan/db/pagination"
-	l "github.com/cloudwan/gohan/log"
 	"github.com/cloudwan/gohan/schema"
+	gohan_sync "github.com/cloudwan/gohan/sync"
 )
 
 const (
@@ -35,43 +37,75 @@ const (
 	eventPollingLimit = 10000
 )
 
-//Start sync Process
-func startSyncProcess(server *Server) {
-	pollingTicker := time.Tick(eventPollingTime)
-	committed := transactionCommitInformer()
-	go func() {
-		defer l.LogFatalPanic(log)
-		recentlySynced := false
-		for server.running {
-			select {
-			case <-pollingTicker:
-				if recentlySynced {
-					recentlySynced = false
-					continue
-				}
-			case <-committed:
-				recentlySynced = true
-			}
-			server.sync.Lock(syncPath, true)
-			server.Sync()
-		}
-		server.sync.Unlock(syncPath)
-	}()
+type SyncWriter struct {
+	sync    gohan_sync.Sync
+	db      db.DB
+	backoff time.Duration
 }
 
-//Stop Sync Process
-func stopSyncProcess(server *Server) {
-	server.sync.Unlock(syncPath)
+func NewSyncWriter(sync gohan_sync.Sync, db db.DB) *SyncWriter {
+	return &SyncWriter{
+		sync:    sync,
+		db:      db,
+		backoff: time.Second * 5,
+	}
+}
+
+// Run starts a loop to keep running Sync()
+func (writer *SyncWriter) Run(ctx context.Context) error {
+	pollingTicker := time.Tick(eventPollingTime)
+	committed := transactionCommitInformer()
+
+	recentlySynced := false
+	for {
+		err := func() error {
+			lost, err := writer.sync.Lock(syncPath, true)
+			if err != nil {
+				return err
+			}
+			defer writer.sync.Unlock(syncPath)
+
+			for {
+				select {
+				case <-lost:
+					return fmt.Errorf("lost lock for sync")
+				case <-ctx.Done():
+					return nil
+				case <-pollingTicker:
+					if recentlySynced {
+						recentlySynced = false
+						continue
+					}
+				case <-committed:
+					recentlySynced = true
+				}
+				err := writer.Sync()
+				if err != nil {
+					return err
+				}
+			}
+		}()
+
+		if err != nil {
+			log.Error("sync writer is intrupted: %s", err)
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(writer.backoff):
+		}
+	}
 }
 
 //Sync to sync backend database table
-func (server *Server) Sync() error {
-	resourceList, err := server.listEvents()
+func (writer *SyncWriter) Sync() error {
+	resourceList, err := writer.listEvents()
 	if err != nil {
 		return err
 	}
 	for _, resource := range resourceList {
-		err = server.syncEvent(resource)
+		err := writer.syncEvent(resource)
 		if err != nil {
 			return err
 		}
@@ -79,8 +113,8 @@ func (server *Server) Sync() error {
 	return nil
 }
 
-func (server *Server) listEvents() ([]*schema.Resource, error) {
-	tx, err := server.db.Begin()
+func (writer *SyncWriter) listEvents() ([]*schema.Resource, error) {
+	tx, err := writer.db.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -95,10 +129,10 @@ func (server *Server) listEvents() ([]*schema.Resource, error) {
 	return resourceList, nil
 }
 
-func (server *Server) syncEvent(resource *schema.Resource) error {
+func (writer *SyncWriter) syncEvent(resource *schema.Resource) error {
 	schemaManager := schema.GetManager()
 	eventSchema, _ := schemaManager.Schema("event")
-	tx, err := server.db.Begin()
+	tx, err := writer.db.Begin()
 	if err != nil {
 		return err
 	}
@@ -159,7 +193,7 @@ func (server *Server) syncEvent(resource *schema.Resource) error {
 			content = string(data)
 		}
 
-		err = server.sync.Update(path, content)
+		err = writer.sync.Update(path, content)
 		if err != nil {
 			log.Error(fmt.Sprintf("%s on sync", err))
 			return err
@@ -178,17 +212,17 @@ func (server *Server) syncEvent(resource *schema.Resource) error {
 			}
 		}
 		log.Debug("deleting %s", statePrefix+deletePath)
-		err = server.sync.Delete(statePrefix + deletePath, false)
+		err = writer.sync.Delete(statePrefix+deletePath, false)
 		if err != nil {
 			log.Error(fmt.Sprintf("Delete from sync failed %s", err))
 		}
 		log.Debug("deleting %s", monitoringPrefix+deletePath)
-		err = server.sync.Delete(monitoringPrefix + deletePath, false)
+		err = writer.sync.Delete(monitoringPrefix+deletePath, false)
 		if err != nil {
 			log.Error(fmt.Sprintf("Delete from sync failed %s", err))
 		}
 		log.Debug("deleting %s", resourcePath)
-		err = server.sync.Delete(path, false)
+		err = writer.sync.Delete(path, false)
 		if err != nil {
 			log.Error(fmt.Sprintf("Delete from sync failed %s", err))
 			return err

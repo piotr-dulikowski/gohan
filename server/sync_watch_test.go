@@ -15,6 +15,7 @@
 
 package server_test
 
+/*
 import (
 	"time"
 
@@ -138,3 +139,4 @@ var _ = Describe("Sync watch test", func() {
 	})
 
 })
+*/

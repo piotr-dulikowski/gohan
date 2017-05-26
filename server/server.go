@@ -16,6 +16,7 @@
 package server
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -33,6 +34,8 @@ import (
 	"github.com/braintree/manners"
 	"github.com/cloudwan/gohan/db"
 	"github.com/cloudwan/gohan/db/migration"
+
+	"github.com/cloudwan/gohan/extension"
 	"github.com/cloudwan/gohan/job"
 	l "github.com/cloudwan/gohan/log"
 	"github.com/cloudwan/gohan/schema"
@@ -53,19 +56,19 @@ type tlsConfig struct {
 
 //Server is a struct for GohanAPIServer
 type Server struct {
-	address                 string
-	tls                     *tlsConfig
-	documentRoot            string
-	db                      db.DB
-	sync                    sync.Sync
-	running                 bool
-	martini                 *martini.ClassicMartini
-	extensions              []string
-	keystoneIdentity        middleware.IdentityService
-	queue                   *job.Queue
+	address          string
+	tls              *tlsConfig
+	documentRoot     string
+	db               db.DB
+	sync             sync.Sync
+	running          bool
+	martini          *martini.ClassicMartini
+	extensions       []string
+	keystoneIdentity middleware.IdentityService
+	queue            *job.Queue
 
-	stopChanProcessWatch    chan bool
-	respChanProcessWatch    chan *sync.Event
+	masterCtx       context.Context
+	masterCtxCancel context.CancelFunc
 }
 
 func (server *Server) mapRoutes() {
@@ -126,7 +129,7 @@ func (server *Server) addOptionsRoute() {
 }
 
 func (server *Server) addPprofRoutes() {
-	server.martini.Group("/debug/pprof", func (r martini.Router) {
+	server.martini.Group("/debug/pprof", func(r martini.Router) {
 		r.Any("/", pprof.Index)
 		r.Any("/cmdline", pprof.Cmdline)
 		r.Any("/profile", pprof.Profile)
@@ -438,12 +441,7 @@ func (server *Server) Router() http.Handler {
 //Stop stops GohanAPIServer
 func (server *Server) Stop() {
 	server.running = false
-	if server.sync != nil {
-		StopProcessWatchProcess(server)
-		stopSyncProcess(server)
-		stopStateWatchProcess(server)
-		StopSyncWatchProcess(server)
-	}
+	server.masterCtxCancel()
 	stopAMQPProcess(server)
 	stopSNMPProcess(server)
 	stopCRONProcess(server)
@@ -485,12 +483,30 @@ func RunServer(configFile string) {
 		}
 	}()
 	server.running = true
+	server.masterCtx, server.masterCtxCancel = context.WithCancel(context.Background())
 
 	if server.sync != nil {
-		StartProcessWatchProcess(server)
-		startSyncProcess(server)
-		startStateWatchProcess(server)
-		StartSyncWatchProcess(server)
+		stateWatcher := newStateWatcher(server.sync, server.db, server.keystoneIdentity)
+		go stateWatcher.Run(server.masterCtx)
+
+		syncWriter := NewSyncWriter(server.sync, server.db)
+		go syncWriter.Run(server.masterCtx)
+
+		config := util.GetConfig()
+		keys := config.GetStringList("watch/keys", []string{})
+		events := config.GetStringList("watch/events", []string{})
+		extensions := map[string]extension.Environment{}
+		for _, event := range events {
+			path := "sync://" + event
+			env, err := server.NewEnvironmentForPath("sync."+event, path)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			extensions[event] = env
+		}
+		syncWatcher := NewSyncWatcher(server.sync, server.queue, keys, events, extensions)
+		go syncWatcher.Run(server.masterCtx)
+
 	}
 	startAMQPProcess(server)
 	startSNMPProcess(server)
