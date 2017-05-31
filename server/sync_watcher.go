@@ -74,7 +74,7 @@ func (watcher *SyncWatcher) Run(ctx context.Context) error {
 		err := func() error {
 			fromRevision := int64(gohan_sync.RevisionCurrent)
 			// register self process to the cluster
-			lockKey := processPath + "/" + watcher.sync.GetProcessID()
+			lockKey := processPathPrefix + "/" + watcher.sync.GetProcessID()
 			lost, err := watcher.sync.Lock(lockKey, true)
 			if err != nil {
 				return err
@@ -82,7 +82,7 @@ func (watcher *SyncWatcher) Run(ctx context.Context) error {
 			defer watcher.sync.Unlock(lockKey)
 
 			watchCtx, watchCancel := context.WithCancel(ctx)
-			events, err := watcher.sync.WatchContext(watchCtx, processPath, fromRevision)
+			events, err := watcher.sync.WatchContext(watchCtx, processPathPrefix, fromRevision)
 			if err != nil {
 				return err
 			}
