@@ -40,8 +40,8 @@ var _ = Describe("Policies", func() {
 			Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 			Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
-			adminAuth = NewAuthorization(adminTenantID, "admin", "fake_token", []string{"admin"}, nil)
-			memberAuth = NewAuthorization(demoTenantID, "demo", "fake_token", []string{"Member"}, nil)
+			adminAuth = NewScopedToTenantAuthorization(Tenant{ID: adminTenantID, Name: "admin"}, Domain{}, "fake_token", []string{"admin"}, nil)
+			memberAuth = NewScopedToTenantAuthorization(Tenant{ID: demoTenantID, Name: "demo"}, Domain{}, "fake_token", []string{"Member"}, nil)
 		})
 
 		AfterEach(func() {
@@ -330,8 +330,10 @@ var _ = Describe("Policies", func() {
 				},
 			}
 			authorization = BaseAuthorization{
-				tenantID:   "userID",
-				tenantName: "userName",
+				tenant: Tenant {
+					ID: "userID",
+					Name: "userName",
+				},
 				authToken:  "token",
 				roles:      []*Role{},
 				catalog:    []*Catalog{},
@@ -354,8 +356,8 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should not pass check - not an owner", func() {
-				authorization.tenantID = "notOwnerID"
-				authorization.tenantName = "notOwnerName"
+				authorization.tenant.ID = "notOwnerID"
+				authorization.tenant.Name = "notOwnerName"
 				err := policy.Check("create", &authorization, data)
 				Expect(err).To(MatchError(getProhibitedError("notOwnerName (notOwnerID)", "userName (userID)")))
 			})

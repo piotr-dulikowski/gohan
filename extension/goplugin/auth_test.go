@@ -46,9 +46,10 @@ var _ = Describe("Auth", func() {
 		Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 		Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
-		adminAuth = schema.NewAuthorization(adminTenantID, "admin", "fake_token", []string{"admin"}, nil)
-		adminOnDemoAuth = schema.NewAuthorization(adminTenantID, "demo", "fake_token", []string{"admin"}, nil)
-		memberAuth = schema.NewAuthorization(demoTenantID, "demo", "fake_token", []string{"Member"}, nil)
+
+		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.Domain{}, "fake_token", []string{"admin"}, nil)
+		adminOnDemoAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "demo"}, schema.Domain{}, "fake_token", []string{"admin"}, nil)
+		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: demoTenantID, Name: "demo"}, schema.Domain{}, "fake_token", []string{"Member"}, nil)
 
 		env = goplugin.NewEnvironment("test", nil, nil)
 	})

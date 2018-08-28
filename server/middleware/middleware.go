@@ -37,6 +37,18 @@ import (
 
 const webuiPATH = "/webui/"
 
+var (
+	adminTenant = schema.Tenant {
+		ID: "admin",
+		Name: "admin",
+	}
+	nobodyTenant = schema.Tenant {
+		ID: "nobody",
+		Name: "nobody",
+	}
+)
+
+
 type responseHijacker struct {
 	martini.ResponseWriter
 	Response *bytes.Buffer
@@ -206,12 +218,12 @@ func (i *NoIdentityService) GetTenantName(string) (string, error) {
 
 //VerifyToken returns always authorization for admin
 func (i *NoIdentityService) VerifyToken(string) (schema.Authorization, error) {
-	return schema.NewAuthorization("admin", "admin", "admin_token", []string{"admin"}, nil), nil
+	return schema.NewScopedToTenantAuthorization(adminTenant, schema.Domain{}, "admin_token", []string{"admin"}, nil), nil
 }
 
 //GetServiceAuthorization returns always authorization for admin
 func (i *NoIdentityService) GetServiceAuthorization() (schema.Authorization, error) {
-	return schema.NewAuthorization("admin", "admin", "admin_token", []string{"admin"}, nil), nil
+	return schema.NewScopedToTenantAuthorization(adminTenant, schema.Domain{}, "admin_token", []string{"admin"}, nil), nil
 }
 
 //GetClient returns always nil
@@ -235,12 +247,12 @@ func (i *NobodyIdentityService) GetTenantName(string) (string, error) {
 
 //VerifyToken returns always authorization for nobody
 func (i *NobodyIdentityService) VerifyToken(string) (schema.Authorization, error) {
-	return schema.NewAuthorization("nobody", "nobody", "nobody_token", []string{"Nobody"}, nil), nil
+	return schema.NewScopedToTenantAuthorization(nobodyTenant, schema.Domain{}, "nobody_token", []string{"Nobody"}, nil), nil
 }
 
 //GetServiceAuthorization returns always authorization for nobody
 func (i *NobodyIdentityService) GetServiceAuthorization() (schema.Authorization, error) {
-	return schema.NewAuthorization("nobody", "nobody", "nobody_token", []string{"Nobody"}, nil), nil
+	return schema.NewScopedToTenantAuthorization(nobodyTenant, schema.Domain{}, "nobody_token", []string{"Nobody"}, nil), nil
 }
 
 //GetClient returns always nil
