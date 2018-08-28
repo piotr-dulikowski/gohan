@@ -137,36 +137,63 @@ type resourceFilter struct {
 	Path             *regexp.Regexp
 }
 
+//ScopingType describes how the authorization is scoped
+type ScopingType int
+const (
+	ScopedToTenant ScopingType = iota
+	ScopedToDomain
+)
+
 //Authorization interface
 type Authorization interface {
 	TenantID() string
 	TenantName() string
+	DomainID() string
+	DomainName() string
 	AuthToken() string
 	Roles() []*Role
 	Catalog() []*Catalog
+	ScopingType() ScopingType
 }
 
 //BaseAuthorization is base struct for Authorization
 type BaseAuthorization struct {
-	tenantID   string
-	tenantName string
-	authToken  string
-	roles      []*Role
-	catalog    []*Catalog
+	scopingType ScopingType
+	tenant      Tenant
+	domain      Domain
+	authToken   string
+	roles       []*Role
+	catalog     []*Catalog
 }
 
-//NewAuthorization is a constructor for auth info
-func NewAuthorization(tenantID, tenantName, authToken string, roleIDs []string, catalog []*Catalog) Authorization {
+//NewScopedToTenantAuthorization is a constructor for auth info scoped to tenant
+func NewScopedToTenantAuthorization(tenant Tenant, domain Domain, authToken string, roleIDs []string, catalog []*Catalog) Authorization {
 	roles := []*Role{}
 	for _, roleID := range roleIDs {
 		roles = append(roles, &Role{Name: roleID})
 	}
 	return &BaseAuthorization{
-		tenantID:   tenantID,
-		roles:      roles,
-		tenantName: tenantName,
-		authToken:  authToken,
-		catalog:    catalog,
+		scopingType: ScopedToTenant,
+		tenant:      tenant,
+		domain:      domain,
+		roles:       roles,
+		authToken:   authToken,
+		catalog:     catalog,
+	}
+}
+
+//NewScopedToDomainAuthorization constructs auth info when user is scoped to domain
+func NewScopedToDomainAuthorization(domain Domain, authToken string, roleIDs []string, catalog []*Catalog) Authorization {
+	roles := []*Role{}
+	for _, roleID := range roleIDs {
+		roles = append(roles, &Role{Name: roleID})
+	}
+	return &BaseAuthorization{
+		scopingType: ScopedToDomain,
+		domain:      domain,
+		roles:       roles,
+		authToken:   authToken,
+		catalog:     catalog,
 	}
 }
 
@@ -177,12 +204,20 @@ func (auth *BaseAuthorization) Roles() []*Role {
 
 //TenantID returns authorized tenant
 func (auth *BaseAuthorization) TenantID() string {
-	return auth.tenantID
+	return auth.tenant.ID
 }
 
 //TenantName returns authorized tenant name
 func (auth *BaseAuthorization) TenantName() string {
-	return auth.tenantName
+	return auth.tenant.Name
+}
+
+func (auth *BaseAuthorization) DomainID() string {
+	return auth.domain.ID
+}
+
+func (auth *BaseAuthorization) DomainName() string {
+	return auth.domain.Name
 }
 
 //AuthToken returns X_AUTH_TOKEN
@@ -193,6 +228,20 @@ func (auth *BaseAuthorization) AuthToken() string {
 //Catalog returns service catalog
 func (auth *BaseAuthorization) Catalog() []*Catalog {
 	return auth.catalog
+}
+
+func (auth* BaseAuthorization) ScopingType() ScopingType {
+	return auth.scopingType
+}
+
+type Tenant struct {
+	ID     string
+	Name   string
+}
+
+type Domain struct {
+	ID   string
+	Name string
 }
 
 //Role describes user role

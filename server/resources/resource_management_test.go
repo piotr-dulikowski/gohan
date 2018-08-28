@@ -64,8 +64,8 @@ var _ = Describe("Resource manager", func() {
 		manager = schema.GetManager()
 		ctx = context_pkg.Background()
 
-		adminAuth = schema.NewAuthorization(adminTenantID, "admin", adminTokenID, []string{"admin"}, nil)
-		memberAuth = schema.NewAuthorization(memberTenantID, "demo", memberTokenID, []string{"Member"}, nil)
+		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.Domain{}, adminTokenID, []string{"admin"}, nil)
+		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, schema.Domain{}, memberTokenID, []string{"Member"}, nil)
 		auth = adminAuth
 		context = middleware.Context{
 			"context": ctx,

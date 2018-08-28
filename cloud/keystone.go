@@ -27,6 +27,7 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/cloudwan/gohan/schema"
+	"errors"
 )
 
 //KeystoneIdentity middleware
@@ -179,15 +180,6 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		roleIDs = append(roleIDs, r.Name)
 	}
 
-	// Get project/tenant
-	project, err := tokenResult.ExtractProject()
-	if err != nil {
-		return nil, err
-	}
-	if project == nil {
-		return nil, fmt.Errorf("Token is unscoped")
-	}
-
 	// Get catalog
 	catalogInput, err := tokenResult.ExtractServiceCatalog()
 	if err != nil {
@@ -204,7 +196,35 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		}
 	}
 
-	return schema.NewAuthorization(project.ID, project.Name, token, roleIDs, catalog), nil
+	// Get project/tenant
+	project, err := tokenResult.ExtractProject()
+	if err != nil {
+		return nil, err
+	}
+	if project != nil {
+		tenant := schema.Tenant {
+			ID: project.ID,
+			Name: project.Name,
+		}
+		domain := schema.Domain {
+			ID: project.Domain.ID,
+			Name: project.Domain.Name,
+		}
+		return schema.NewScopedToTenantAuthorization(tenant, domain, token, roleIDs, catalog), nil
+	} else {
+		dom, err := extractDomain(tokenResult)
+		if err != nil {
+			return nil, err
+		}
+		if dom == nil {
+			return nil, errors.New("Token is unscoped")
+		}
+		domain := schema.Domain {
+			ID: dom.ID,
+			Name: dom.Name,
+		}
+		return schema.NewScopedToDomainAuthorization(domain, token, roleIDs, catalog), nil
+	}
 }
 
 // GetTenantID maps the given v3.0 project ID to the projects's name
@@ -243,6 +263,14 @@ func (client *keystoneV3Client) GetServiceAuthorization() (schema.Authorization,
 // GetClient returns openstack client
 func (client *keystoneV3Client) GetClient() *gophercloud.ServiceClient {
 	return client.client
+}
+
+func extractDomain(result v3tokens.GetResult) (*v3tokens.Domain, error) {
+	var s struct {
+		Domain *v3tokens.Domain `json:"domain"`
+	}
+	err := result.ExtractInto(&s)
+	return s.Domain, err
 }
 
 //VerifyToken verifies keystone v2.0 token
@@ -294,7 +322,7 @@ func (client *keystoneV2Client) VerifyToken(token string) (schema.Authorization,
 		}
 		catalogObj = append(catalogObj, schema.NewCatalog(catalog["name"].(string), catalog["type"].(string), endPoints))
 	}
-	return schema.NewAuthorization(tenantID, tenantName, token, roleIDs, catalogObj), nil
+	return schema.NewScopedToTenantAuthorization(schema.Tenant{ID: tenantID, Name: tenantName}, schema.Domain{}, token, roleIDs, catalogObj), nil
 }
 
 // GetTenantID maps the given v2.0 project name to the tenant's id

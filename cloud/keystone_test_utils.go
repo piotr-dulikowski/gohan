@@ -33,7 +33,7 @@ func getV2TokensResponse() interface{} {
 	}
 }
 
-func getV3TokensResponse() interface{} {
+func getV3TokensScopedToTenantResponse() interface{} {
 	return map[string]interface{}{
 		"token": map[string]interface{}{
 			"expires_at": "2013-02-27T18:30:59.999999Z",
@@ -58,11 +58,42 @@ func getV3TokensResponse() interface{} {
 			"catalog": []interface{}{},
 			"project": map[string]interface{}{
 				"domain": map[string]interface{}{
-					"id":   "default",
+					"id":   "default-id",
 					"name": "default",
 				},
 				"id":   "acme-id",
 				"name": "acme",
+			},
+		},
+	}
+}
+
+func getV3TokensScopedToDomainResponse() interface{} {
+	return map[string]interface{}{
+		"token": map[string]interface{}{
+			"expires_at": "2013-02-27T18:30:59.999999Z",
+			"issued_at":  "2013-02-27T16:30:59.999999Z",
+			"methods": []string{
+				"password",
+			},
+			"user": map[string]interface{}{
+				"domain": map[string]interface{}{
+					"id":   "111",
+					"name": "domain",
+				},
+				"id":   "1234",
+				"name": "admin",
+			},
+			"roles": []interface{}{
+				map[string]interface{}{
+					"id":   "51cc68287d524c759f47c811e6463340",
+					"name": "member",
+				},
+			},
+			"catalog": []interface{}{},
+			"domain": map[string]interface{}{
+				"id":   "default-id",
+				"name": "default",
 			},
 		},
 	}
