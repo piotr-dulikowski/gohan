@@ -160,7 +160,7 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		return nil, fmt.Errorf("Error during verifying token: %s", tokenResult.Err.Error())
 	}
 	_, err := tokenResult.ExtractToken()
-	body, ok := tokenResult.Body.(map[string]interface{})
+	_, ok := tokenResult.Body.(map[string]interface{})
 	// tricky gophercloud behavior.
 	// If system token doesn't need reauth, err is set when token is invalid
 	// If system token needed reauth and user token is invalid, err wont be propagated neither by return nor Err field,
@@ -169,41 +169,42 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		return nil, fmt.Errorf("Invalid token")
 	}
 
-	tokenBody, ok := body["token"]
-	if !ok {
-		return nil, fmt.Errorf("no token property in body %s", body)
+	// Get roles
+	roles, err := tokenResult.ExtractRoles()
+	if err != nil {
+		return nil, err
 	}
-	tokenMap := tokenBody.(map[string]interface{})
-	roles := tokenMap["roles"]
 	roleIDs := []string{}
-	for _, roleBody := range roles.([]interface{}) {
-		roleIDs = append(roleIDs, roleBody.(map[string]interface{})["name"].(string))
+	for _, r := range roles {
+		roleIDs = append(roleIDs, r.Name)
 	}
-	projectObj, ok := tokenMap["project"]
-	if !ok {
+
+	// Get project/tenant
+	project, err := tokenResult.ExtractProject()
+	if err != nil {
+		return nil, err
+	}
+	if project == nil {
 		return nil, fmt.Errorf("Token is unscoped")
 	}
-	project := projectObj.(map[string]interface{})
-	tenantID := project["id"].(string)
-	tenantName := project["name"].(string)
-	catalogList, ok := tokenMap["catalog"].([]interface{})
-	catalogObj := []*schema.Catalog{}
-	if ok {
-		for _, rawCatalog := range catalogList {
-			catalog := rawCatalog.(map[string]interface{})
-			endPoints := []*schema.Endpoint{}
-			rawEndpoints, ok := catalog["endpoints"].([]interface{})
-			if ok {
-				for _, rawEndpoint := range rawEndpoints {
-					endpoint := rawEndpoint.(map[string]interface{})
-					endPoints = append(endPoints,
-						schema.NewEndpoint(endpoint["url"].(string), endpoint["region"].(string), endpoint["interface"].(string)))
-				}
+
+	// Get catalog
+	catalogInput, err := tokenResult.ExtractServiceCatalog()
+	if err != nil {
+		return nil, err
+	}
+	catalog := []*schema.Catalog{}
+	if catalogInput != nil {
+		for _, entry := range catalogInput.Entries {
+			endpoints := []*schema.Endpoint{}
+			for _, e := range entry.Endpoints {
+				endpoints = append(endpoints, schema.NewEndpoint(e.URL, e.Region, e.Interface))
 			}
-			catalogObj = append(catalogObj, schema.NewCatalog(catalog["name"].(string), catalog["type"].(string), endPoints))
+			catalog = append(catalog, schema.NewCatalog(entry.Name, entry.Type, endpoints))
 		}
 	}
-	return schema.NewAuthorization(tenantID, tenantName, token, roleIDs, catalogObj), nil
+
+	return schema.NewAuthorization(project.ID, project.Name, token, roleIDs, catalog), nil
 }
 
 // GetTenantID maps the given v3.0 project ID to the projects's name
