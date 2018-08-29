@@ -399,7 +399,9 @@ func MapRouteBySchema(server *Server, dataStore db.DB, s *schema.Schema) {
 			}
 			context["policy"] = policy
 			context["role"] = role
+			context["token_scoping_type"] = string(auth.ScopingType())
 			context["tenant_id"] = auth.TenantID()
+			context["domain_id"] = auth.DomainID()
 			context["auth_token"] = auth.AuthToken()
 			context["catalog"] = auth.Catalog()
 			context["auth"] = auth

@@ -366,8 +366,11 @@ func Tracing() martini.Handler {
 //Authorization checks user permissions against policy
 func Authorization(action string) martini.Handler {
 	return func(res http.ResponseWriter, req *http.Request, auth schema.Authorization, context Context) {
+		context["token_scoping_type"] = string(auth.ScopingType())
 		context["tenant_id"] = auth.TenantID()
 		context["tenant_name"] = auth.TenantName()
+		context["domain_id"] = auth.DomainID()
+		context["domain_name"] = auth.DomainName()
 		context["auth_token"] = auth.AuthToken()
 		context["catalog"] = auth.Catalog()
 		context["auth"] = auth
