@@ -604,10 +604,7 @@ func CreateResource(
 	}
 
 	if tenantID, ok := dataMap["tenant_id"]; ok && tenantID != nil {
-		dataMap["tenant_name"], err = identityService.GetTenantName(tenantID.(string))
-		if err != nil {
-			return ResourceError{err, err.Error(), Unauthorized}
-		}
+		dataMap["tenant_name"] = auth.TenantName()
 	}
 
 	//Apply policy for api input
@@ -750,10 +747,7 @@ func UpdateResource(
 
 	//fillup default values
 	if tenantID, ok := dataMap["tenant_id"]; ok && tenantID != nil {
-		dataMap["tenant_name"], err = identityService.GetTenantName(tenantID.(string))
-		if err != nil {
-			return ResourceError{err, err.Error(), Unauthorized}
-		}
+		dataMap["tenant_name"] = auth.TenantName()
 	}
 
 	//check policy

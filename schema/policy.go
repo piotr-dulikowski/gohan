@@ -138,10 +138,10 @@ type resourceFilter struct {
 }
 
 //ScopingType describes how the authorization is scoped
-type ScopingType int
+type ScopingType string
 const (
-	ScopedToTenant ScopingType = iota
-	ScopedToDomain
+	ScopedToTenant ScopingType = "to_tenant"
+	ScopedToDomain ScopingType = "to_domain"
 )
 
 //Authorization interface
