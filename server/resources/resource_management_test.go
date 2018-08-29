@@ -64,8 +64,13 @@ var _ = Describe("Resource manager", func() {
 		manager = schema.GetManager()
 		ctx = context_pkg.Background()
 
-		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.Domain{}, adminTokenID, []string{"admin"}, nil)
-		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, schema.Domain{}, memberTokenID, []string{"Member"}, nil)
+		domainA := schema.Domain{
+			ID:   domainAID,
+			Name: "domainA",
+		}
+
+		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, domainA, adminTokenID, []string{"admin"}, nil)
+		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, domainA, memberTokenID, []string{"Member"}, nil)
 		auth = adminAuth
 		context = middleware.Context{
 			"context": ctx,
@@ -77,6 +82,21 @@ var _ = Describe("Resource manager", func() {
 
 	environmentManager := extension.GetManager()
 
+	setupAuthContext := func(context middleware.Context, auth schema.Authorization, path, action string) {
+		policy, role := manager.PolicyValidate(action, path, auth)
+		Expect(policy).ToNot(BeNil())
+		context["policy"] = policy
+		context["role"] = role
+		context["token_scoping_type"] = string(auth.ScopingType())
+		context["tenant_id"] = auth.TenantID()
+		context["tenant_name"] = auth.TenantName()
+		context["domain_id"] = auth.DomainID()
+		context["domain_name"] = auth.DomainName()
+		context["auth_token"] = auth.AuthToken()
+		context["catalog"] = auth.Catalog()
+		context["auth"] = auth
+	}
+
 	JustBeforeEach(func() {
 		var ok bool
 		currentSchema, ok = manager.Schema(schemaID)
@@ -84,15 +104,7 @@ var _ = Describe("Resource manager", func() {
 
 		path = currentSchema.GetPluralURL()
 
-		policy, role := manager.PolicyValidate(action, path, auth)
-		Expect(policy).NotTo(BeNil())
-		context["policy"] = policy
-		context["role"] = role
-		context["tenant_id"] = auth.TenantID()
-		context["tenant_name"] = auth.TenantName()
-		context["auth_token"] = auth.AuthToken()
-		context["catalog"] = auth.Catalog()
-		context["auth"] = auth
+		setupAuthContext(context, auth, path, action)
 
 		env = otto.NewEnvironment("resource_management_test", testDB, &middleware.FakeIdentity{}, testSync)
 		extensions = []*schema.Extension{}
@@ -382,6 +394,7 @@ var _ = Describe("Resource manager", func() {
 				adminResourceData = map[string]interface{}{
 					"id":           resourceID1,
 					"tenant_id":    adminTenantID,
+					"domain_id":    domainAID,
 					"test_string":  "Steloj estas en ordo.",
 					"test_number":  0.5,
 					"test_integer": 1,
@@ -390,6 +403,7 @@ var _ = Describe("Resource manager", func() {
 				memberResourceData = map[string]interface{}{
 					"id":           resourceID2,
 					"tenant_id":    powerUserTenantID,
+					"domain_id":    domainAID,
 					"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
 					"test_number":  0.5,
 					"test_integer": 1,
@@ -545,6 +559,7 @@ var _ = Describe("Resource manager", func() {
 				adminResourceData = map[string]interface{}{
 					"id":           resourceID1,
 					"tenant_id":    adminTenantID,
+					"domain_id":    domainAID,
 					"test_string":  "Steloj estas en ordo.",
 					"test_number":  0.5,
 					"test_integer": 1,
@@ -553,6 +568,7 @@ var _ = Describe("Resource manager", func() {
 				memberResourceData = map[string]interface{}{
 					"id":           resourceID2,
 					"tenant_id":    powerUserTenantID,
+					"domain_id":    domainAID,
 					"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
 					"test_number":  0.5,
 					"test_integer": 1,
@@ -943,6 +959,7 @@ var _ = Describe("Resource manager", func() {
 			adminResourceData = map[string]interface{}{
 				"id":           resourceID1,
 				"tenant_id":    adminTenantID,
+				"domain_id":    domainAID,
 				"test_string":  "Steloj estas en ordo.",
 				"test_number":  0.5,
 				"test_integer": 1,
@@ -951,6 +968,7 @@ var _ = Describe("Resource manager", func() {
 			memberResourceData = map[string]interface{}{
 				"id":           resourceID2,
 				"tenant_id":    powerUserTenantID,
+				"domain_id":    domainBID,
 				"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
 				"test_number":  0.5,
 				"test_integer": 1,
@@ -980,33 +998,48 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should fill in an id", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"tenant_id": adminTenantID})
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"tenant_id": adminTenantID, "domain_id": domainAID})
 					Expect(err).NotTo(HaveOccurred())
 					result := context["response"].(map[string]interface{})
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
+					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
 					Expect(theResource).To(HaveKey("id"))
 				})
 
 				It("Should fill in the tenant_id", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1})
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1, "domain_id": domainAID})
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
+					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
 					Expect(theResource).To(HaveKeyWithValue("id", resourceID1))
 				})
 
-				It("Should fill in id and tenant_id", func() {
+				It("Should fill in the domain_id", func() {
+					err := resources.CreateResource(
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1, "tenant_id": adminTenantID})
+					result := context["response"].(map[string]interface{})
+					Expect(err).NotTo(HaveOccurred())
+					theResource, ok := result[schemaID]
+					Expect(ok).To(BeTrue())
+					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
+					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
+					Expect(theResource).To(HaveKeyWithValue("id", resourceID1))
+				})
+
+				It("Should fill in id, tenant_id and domain_id", func() {
 					err := resources.CreateResource(
 						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{})
 					Expect(err).NotTo(HaveOccurred())
 					result := context["response"].(map[string]interface{})
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
+					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
 					Expect(theResource).To(HaveKey("id"))
 				})
@@ -1254,12 +1287,13 @@ var _ = Describe("Resource manager", func() {
 				events["pre_update"] = javascriptCode
 				events["pre_update_in_transaction"] = javascriptCode
 			})
-			It("Should receive id and tenat_id but should not update them", func() {
+			It("Should receive id, tenant_id and domain_id but should not update them", func() {
 				err := resources.CreateResource(
 					context, testDB, fakeIdentity, currentSchema, adminResourceData)
 				Expect(err).To(Succeed())
 				delete(adminResourceData, "id")
 				delete(adminResourceData, "tenant_id")
+				delete(adminResourceData, "domain_id")
 
 				err = resources.UpdateResource(
 					context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
@@ -1785,51 +1819,11 @@ var _ = Describe("Resource manager", func() {
 		})
 
 		JustBeforeEach(func() {
-			policy, role := manager.PolicyValidate("list", path, auth)
-			Expect(policy).NotTo(BeNil())
-			listContext["policy"] = policy
-			listContext["role"] = role
-			listContext["tenant_id"] = auth.TenantID()
-			listContext["tenant_name"] = auth.TenantName()
-			listContext["auth_token"] = auth.AuthToken()
-			listContext["catalog"] = auth.Catalog()
-			listContext["auth"] = auth
-			policy, role = manager.PolicyValidate("show", path, auth)
-			Expect(policy).NotTo(BeNil())
-			showContext["policy"] = policy
-			showContext["role"] = role
-			showContext["tenant_id"] = auth.TenantID()
-			showContext["tenant_name"] = auth.TenantName()
-			showContext["auth_token"] = auth.AuthToken()
-			showContext["catalog"] = auth.Catalog()
-			showContext["auth"] = auth
-			policy, role = manager.PolicyValidate("delete", path, auth)
-			Expect(policy).NotTo(BeNil())
-			deleteContext["policy"] = policy
-			deleteContext["role"] = role
-			deleteContext["tenant_id"] = auth.TenantID()
-			deleteContext["tenant_name"] = auth.TenantName()
-			deleteContext["auth_token"] = auth.AuthToken()
-			deleteContext["catalog"] = auth.Catalog()
-			deleteContext["auth"] = auth
-			policy, role = manager.PolicyValidate("create", path, auth)
-			Expect(policy).NotTo(BeNil())
-			createContext["policy"] = policy
-			createContext["role"] = role
-			createContext["tenant_id"] = auth.TenantID()
-			createContext["tenant_name"] = auth.TenantName()
-			createContext["auth_token"] = auth.AuthToken()
-			createContext["catalog"] = auth.Catalog()
-			createContext["auth"] = auth
-			policy, role = manager.PolicyValidate("update", path, auth)
-			Expect(policy).NotTo(BeNil())
-			updateContext["policy"] = policy
-			updateContext["role"] = role
-			updateContext["tenant_id"] = auth.TenantID()
-			updateContext["tenant_name"] = auth.TenantName()
-			updateContext["auth_token"] = auth.AuthToken()
-			updateContext["catalog"] = auth.Catalog()
-			updateContext["auth"] = auth
+			setupAuthContext(listContext, auth, path, "list")
+			setupAuthContext(showContext, auth, path, "show")
+			setupAuthContext(deleteContext, auth, path, "delete")
+			setupAuthContext(createContext, auth, path, "create")
+			setupAuthContext(updateContext, auth, path, "update")
 		})
 
 		It("Should behave as expected", func() {
