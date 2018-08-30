@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwan/gohan/util"
 	"github.com/mohae/deepcopy"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/twinj/uuid"
 )
@@ -637,6 +638,14 @@ var _ = Describe("Resource manager", func() {
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
 				})
+
+				It("Should not return resource from other domain", func() {
+					err := resources.GetSingleResource(
+						context, testDB, currentSchema, resourceID3)
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+				})
 			})
 
 			Context("As a domain-scoped user", func() {
@@ -644,13 +653,17 @@ var _ = Describe("Resource manager", func() {
 					auth = domainScopedAuth
 				})
 
-				It("Should return resource from the same domain", func() {
-					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID1)
-					Expect(err).ToNot(HaveOccurred())
-					result := context["response"].(map[string]interface{})
-					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(adminResourceData)))
-				})
+				DescribeTable("Should return resource from the same domain",
+					func(resourceID string, data *map[string]interface{}) {
+						err := resources.GetSingleResource(
+							context, testDB, currentSchema, resourceID)
+						Expect(err).ToNot(HaveOccurred())
+						result := context["response"].(map[string]interface{})
+						Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(*data)))
+					},
+					Entry("Resource 1", resourceID1, &adminResourceData),
+					Entry("Resource 2", resourceID2, &memberResourceData),
+				)
 
 				It("Should not return resource from other domain", func() {
 					err := resources.GetSingleResource(
@@ -852,6 +865,11 @@ var _ = Describe("Resource manager", func() {
 					Expect(resources.DeleteResource(
 						context, testDB, currentSchema, resourceID2)).To(Succeed())
 				})
+
+				It("Should delete resource from other domain", func() {
+					Expect(resources.DeleteResource(
+						context, testDB, currentSchema, resourceID3)).To(Succeed())
+				})
 			})
 
 			Context("As a member", func() {
@@ -867,6 +885,35 @@ var _ = Describe("Resource manager", func() {
 				It("Should not delete not owned resource", func() {
 					err := resources.DeleteResource(
 						context, testDB, currentSchema, resourceID2)
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+				})
+
+				It("Should not delete resource from other domain", func() {
+					err := resources.DeleteResource(
+						context, testDB, currentSchema, resourceID3)
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+				})
+			})
+
+			Context("As a domain-scoped user", func() {
+				BeforeEach(func() {
+					auth = domainScopedAuth
+				})
+
+				It("Should delete resource from the same domain", func() {
+					Expect(resources.DeleteResource(
+						context, testDB, currentSchema, resourceID1)).To(Succeed())
+					Expect(resources.DeleteResource(
+						context, testDB, currentSchema, resourceID2)).To(Succeed())
+				})
+
+				It("Should not delete resource from other domain", func() {
+					err := resources.DeleteResource(
+						context, testDB, currentSchema, resourceID3)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -1061,6 +1108,52 @@ var _ = Describe("Resource manager", func() {
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
 				})
+
+				It("Should not create resource in other domain", func() {
+					err := resources.CreateResource(
+						context, testDB, fakeIdentity, currentSchema, otherDomainResourceData)
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+				})
+			})
+
+			Context("As a domain-scoped user", func() {
+				BeforeEach(func() {
+					auth = domainScopedAuth
+				})
+
+				DescribeTable("Should create resource in current domain",
+					func(resourceData *map[string]interface{}) {
+						err := resources.CreateResource(
+							context, testDB, fakeIdentity, currentSchema, adminResourceData)
+						result := context["response"].(map[string]interface{})
+						Expect(err).NotTo(HaveOccurred())
+						Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(*resourceData)))
+					},
+					Entry("Resource 1", &adminResourceData),
+					Entry("Resource 2", &memberResourceData),
+				)
+
+				It("Should not create resource in other domain", func() {
+					err := resources.CreateResource(
+						context, testDB, fakeIdentity, currentSchema, otherDomainResourceData)
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+				})
+
+				It("Should fill in the domain_id", func() {
+					err := resources.CreateResource(
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1, "tenant_id": adminTenantID})
+					result := context["response"].(map[string]interface{})
+					Expect(err).NotTo(HaveOccurred())
+					theResource, ok := result[schemaID]
+					Expect(ok).To(BeTrue())
+					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
+					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
+					Expect(theResource).To(HaveKeyWithValue("id", resourceID1))
+				})
 			})
 
 			Describe("With extensions", func() {
@@ -1136,18 +1229,7 @@ var _ = Describe("Resource manager", func() {
 		})
 
 		Describe("When there are resources in the database", func() {
-			JustBeforeEach(func() {
-				adminResource, err := manager.LoadResource(currentSchema.ID, adminResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				transaction, err := testDB.BeginTx()
-				Expect(err).NotTo(HaveOccurred())
-				defer transaction.Close()
-				Expect(transaction.Create(ctx, adminResource)).To(Succeed())
-				Expect(transaction.Create(ctx, memberResource)).To(Succeed())
-				Expect(transaction.Commit()).To(Succeed())
-			})
+			JustBeforeEach(setupAndCreateTestResources)
 
 			It("Should not create duplicate resource", func() {
 				err := resources.CreateResource(
@@ -1268,18 +1350,7 @@ var _ = Describe("Resource manager", func() {
 		})
 
 		Describe("When there are resources in the database", func() {
-			JustBeforeEach(func() {
-				adminResource, err := manager.LoadResource(currentSchema.ID, adminResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				transaction, err := testDB.BeginTx()
-				Expect(err).NotTo(HaveOccurred())
-				defer transaction.Close()
-				Expect(transaction.Create(ctx, adminResource)).To(Succeed())
-				Expect(transaction.Create(ctx, memberResource)).To(Succeed())
-				Expect(transaction.Commit()).To(Succeed())
-			})
+			JustBeforeEach(setupAndCreateTestResources)
 
 			Context("As an admin", func() {
 				var (
@@ -1301,27 +1372,21 @@ var _ = Describe("Resource manager", func() {
 					}
 				})
 
-				It("Should update own resource", func() {
-					err := resources.UpdateResource(
-						context, testDB, fakeIdentity, currentSchema, resourceID1,
-						map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
-					result := context["response"].(map[string]interface{})
-					Expect(err).NotTo(HaveOccurred())
-					theResource, ok := result[schemaID]
-					Expect(ok).To(BeTrue())
-					Expect(theResource).To(HaveKeyWithValue("test_string", "Steloj ne estas en ordo."))
-				})
-
-				It("Should update not own resource", func() {
-					err := resources.UpdateResource(
-						context, testDB, fakeIdentity, currentSchema, resourceID1,
-						map[string]interface{}{"test_string": "Ia, ia, HJPEV fhtang!"})
-					result := context["response"].(map[string]interface{})
-					Expect(err).NotTo(HaveOccurred())
-					theResource, ok := result[schemaID]
-					Expect(ok).To(BeTrue())
-					Expect(theResource).To(HaveKeyWithValue("test_string", "Ia, ia, HJPEV fhtang!"))
-				})
+				DescribeTable("Should update",
+					func(resourceID string) {
+						err := resources.UpdateResource(
+							context, testDB, fakeIdentity, currentSchema, resourceID,
+							map[string]interface{}{"test_string": "Ia, ia, HJPEV fhtang!"})
+						result := context["response"].(map[string]interface{})
+						Expect(err).NotTo(HaveOccurred())
+						theResource, ok := result[schemaID]
+						Expect(ok).To(BeTrue())
+						Expect(theResource).To(HaveKeyWithValue("test_string", "Ia, ia, HJPEV fhtang!"))
+					},
+					Entry("Own resource", resourceID1),
+					Entry("Not own resource, same domain", resourceID2),
+					Entry("Resource form other domain", resourceID3),
+				)
 
 				It("Should only modify updated fields in subobjects", func() {
 					networkSchema, _ := manager.Schema("network")
@@ -1418,6 +1483,34 @@ var _ = Describe("Resource manager", func() {
 				It("Should not update not own resource", func() {
 					err := resources.UpdateResource(
 						context, testDB, fakeIdentity, currentSchema, resourceID2,
+						map[string]interface{}{"test_string": "Ia, ia, HWCBN fhtang!"})
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+					resource, _ := context["response"].(map[string]interface{})
+					Expect(resource).To(BeNil())
+				})
+			})
+
+			Context("As a domain-scoped user", func() {
+				DescribeTable("Should update resource in current domain",
+					func(resourceID string) {
+						err := resources.UpdateResource(
+							context, testDB, fakeIdentity, currentSchema, resourceID,
+							map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
+						Expect(err).NotTo(HaveOccurred())
+						result := context["response"].(map[string]interface{})
+						theResource, ok := result[schemaID]
+						Expect(ok).To(BeTrue())
+						Expect(theResource).To(HaveKeyWithValue("test_string", "Steloj ne estas en ordo."))
+					},
+					Entry("Resource 1", resourceID1),
+					Entry("Resource 2", resourceID2),
+				)
+
+				It("Should not update resource from other domain", func() {
+					err := resources.UpdateResource(
+						context, testDB, fakeIdentity, currentSchema, resourceID3,
 						map[string]interface{}{"test_string": "Ia, ia, HWCBN fhtang!"})
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
