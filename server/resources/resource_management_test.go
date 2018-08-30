@@ -44,22 +44,25 @@ var _ = Describe("Resource manager", func() {
 	)
 
 	var (
-		manager          *schema.Manager
-		adminAuth        schema.Authorization
-		memberAuth       schema.Authorization
-		domainScopedAuth schema.Authorization
-		auth             schema.Authorization
-		context          middleware.Context
-		schemaID         string
-		path             string
-		action           string
-		currentSchema    *schema.Schema
-		extensions       []*schema.Extension
-		env              extension.Environment
-		events           map[string]string
-		timeLimit        time.Duration
-		timeLimits       []*schema.PathEventTimeLimit
-		ctx              context_pkg.Context
+		manager                 *schema.Manager
+		adminAuth               schema.Authorization
+		memberAuth              schema.Authorization
+		domainScopedAuth        schema.Authorization
+		auth                    schema.Authorization
+		context                 middleware.Context
+		schemaID                string
+		path                    string
+		action                  string
+		currentSchema           *schema.Schema
+		extensions              []*schema.Extension
+		env                     extension.Environment
+		events                  map[string]string
+		timeLimit               time.Duration
+		timeLimits              []*schema.PathEventTimeLimit
+		ctx                     context_pkg.Context
+		adminResourceData       map[string]interface{}
+		memberResourceData      map[string]interface{}
+		otherDomainResourceData map[string]interface{}
 	)
 
 	BeforeEach(func() {
@@ -98,6 +101,57 @@ var _ = Describe("Resource manager", func() {
 		context["auth_token"] = auth.AuthToken()
 		context["catalog"] = auth.Catalog()
 		context["auth"] = auth
+	}
+
+	setupTestResources := func() {
+		adminResourceData = map[string]interface{}{
+			"id":           resourceID1,
+			"tenant_id":    adminTenantID,
+			"domain_id":    domainAID,
+			"test_string":  "Steloj estas en ordo.",
+			"test_number":  0.5,
+			"test_integer": 1,
+			"test_bool":    false,
+		}
+		memberResourceData = map[string]interface{}{
+			"id":           resourceID2,
+			"tenant_id":    powerUserTenantID,
+			"domain_id":    domainAID,
+			"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
+			"test_number":  0.5,
+			"test_integer": 1,
+			"test_bool":    false,
+		}
+		otherDomainResourceData = map[string]interface{}{
+			"id":           resourceID3,
+			"tenant_id":    memberTenantID,
+			"domain_id":    domainBID,
+			"test_string":  "Mi estas tekruĉo.",
+			"test_number":  0.5,
+			"test_integer": 1,
+			"test_bool":    false,
+		}
+	}
+
+	createTestResources := func() {
+		adminResource, err := manager.LoadResource(currentSchema.ID, adminResourceData)
+		Expect(err).NotTo(HaveOccurred())
+		memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
+		Expect(err).NotTo(HaveOccurred())
+		otherDomainResource, err := manager.LoadResource(currentSchema.ID, otherDomainResourceData)
+		Expect(err).NotTo(HaveOccurred())
+		transaction, err := testDB.BeginTx()
+		Expect(err).NotTo(HaveOccurred())
+		defer transaction.Close()
+		Expect(transaction.Create(ctx, adminResource)).To(Succeed())
+		Expect(transaction.Create(ctx, memberResource)).To(Succeed())
+		Expect(transaction.Create(ctx, otherDomainResource)).To(Succeed())
+		Expect(transaction.Commit()).To(Succeed())
+	}
+
+	setupAndCreateTestResources := func() {
+		setupTestResources()
+		createTestResources()
 	}
 
 	JustBeforeEach(func() {
@@ -389,55 +443,7 @@ var _ = Describe("Resource manager", func() {
 		})
 
 		Describe("When there are resources in the database", func() {
-			var (
-				adminResourceData, memberResourceData, otherDomainResourceData map[string]interface{}
-			)
-
-			BeforeEach(func() {
-				adminResourceData = map[string]interface{}{
-					"id":           resourceID1,
-					"tenant_id":    adminTenantID,
-					"domain_id":    domainAID,
-					"test_string":  "Steloj estas en ordo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-				memberResourceData = map[string]interface{}{
-					"id":           resourceID2,
-					"tenant_id":    powerUserTenantID,
-					"domain_id":    domainAID,
-					"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-				otherDomainResourceData = map[string]interface{}{
-					"id":           resourceID3,
-					"tenant_id":    memberTenantID,
-					"domain_id":    domainBID,
-					"test_string":  "Mi estas tekruĉo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-			})
-
-			JustBeforeEach(func() {
-				adminResource, err := manager.LoadResource(currentSchema.ID, adminResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				otherDomainResource, err := manager.LoadResource(currentSchema.ID, otherDomainResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				transaction, err := testDB.BeginTx()
-				Expect(err).NotTo(HaveOccurred())
-				defer transaction.Close()
-				Expect(transaction.Create(ctx, adminResource)).To(Succeed())
-				Expect(transaction.Create(ctx, memberResource)).To(Succeed())
-				Expect(transaction.Create(ctx, otherDomainResource)).To(Succeed())
-				Expect(transaction.Commit()).To(Succeed())
-			})
+			JustBeforeEach(setupAndCreateTestResources)
 
 			Context("As an admin", func() {
 				It("Should return a filled list", func() {
@@ -583,43 +589,7 @@ var _ = Describe("Resource manager", func() {
 		})
 
 		Describe("When there are resources in the database", func() {
-			var (
-				adminResourceData, memberResourceData map[string]interface{}
-			)
-
-			BeforeEach(func() {
-				adminResourceData = map[string]interface{}{
-					"id":           resourceID1,
-					"tenant_id":    adminTenantID,
-					"domain_id":    domainAID,
-					"test_string":  "Steloj estas en ordo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-				memberResourceData = map[string]interface{}{
-					"id":           resourceID2,
-					"tenant_id":    powerUserTenantID,
-					"domain_id":    domainAID,
-					"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-			})
-
-			JustBeforeEach(func() {
-				adminResource, err := manager.LoadResource(currentSchema.ID, adminResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				transaction, err := testDB.BeginTx()
-				Expect(err).NotTo(HaveOccurred())
-				defer transaction.Close()
-				Expect(transaction.Create(ctx, adminResource)).To(Succeed())
-				Expect(transaction.Create(ctx, memberResource)).To(Succeed())
-				Expect(transaction.Commit()).To(Succeed())
-			})
+			JustBeforeEach(setupAndCreateTestResources)
 
 			Context("As an admin", func() {
 				It("Should return owned resource", func() {
@@ -840,43 +810,7 @@ var _ = Describe("Resource manager", func() {
 		})
 
 		Describe("When there are resources in the database", func() {
-			var (
-				adminResourceData, memberResourceData map[string]interface{}
-			)
-
-			BeforeEach(func() {
-				adminResourceData = map[string]interface{}{
-					"id":           resourceID1,
-					"tenant_id":    adminTenantID,
-					"domain_id":    domainAID,
-					"test_string":  "Steloj estas en ordo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-				memberResourceData = map[string]interface{}{
-					"id":           resourceID2,
-					"tenant_id":    powerUserTenantID,
-					"domain_id":    domainAID,
-					"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
-					"test_number":  0.5,
-					"test_integer": 1,
-					"test_bool":    false,
-				}
-			})
-
-			JustBeforeEach(func() {
-				adminResource, err := manager.LoadResource(currentSchema.ID, adminResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
-				Expect(err).NotTo(HaveOccurred())
-				transaction, err := testDB.BeginTx()
-				Expect(err).NotTo(HaveOccurred())
-				defer transaction.Close()
-				Expect(transaction.Create(ctx, adminResource)).To(Succeed())
-				Expect(transaction.Create(ctx, memberResource)).To(Succeed())
-				Expect(transaction.Commit()).To(Succeed())
-			})
+			JustBeforeEach(setupAndCreateTestResources)
 
 			Context("As an admin", func() {
 				It("Should delete owned resource", func() {
@@ -983,31 +917,13 @@ var _ = Describe("Resource manager", func() {
 
 	Describe("Creating a resource", func() {
 		var (
-			adminResourceData, memberResourceData map[string]interface{}
-			fakeIdentity                          middleware.IdentityService
+			fakeIdentity middleware.IdentityService
 		)
 
 		BeforeEach(func() {
 			schemaID = "test"
 			action = "create"
-			adminResourceData = map[string]interface{}{
-				"id":           resourceID1,
-				"tenant_id":    adminTenantID,
-				"domain_id":    domainAID,
-				"test_string":  "Steloj estas en ordo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
-			memberResourceData = map[string]interface{}{
-				"id":           resourceID2,
-				"tenant_id":    powerUserTenantID,
-				"domain_id":    domainBID,
-				"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
+			setupTestResources()
 			fakeIdentity = &middleware.FakeIdentity{}
 		})
 
@@ -1215,31 +1131,14 @@ var _ = Describe("Resource manager", func() {
 
 	Describe("Updating a resource", func() {
 		var (
-			adminResourceData, memberResourceData map[string]interface{}
-			fakeIdentity                          middleware.IdentityService
+			fakeIdentity middleware.IdentityService
 		)
 
 		BeforeEach(func() {
 			schemaID = "test"
 			action = "create"
-			adminResourceData = map[string]interface{}{
-				"id":           resourceID1,
-				"tenant_id":    adminTenantID,
-				"domain_id":    domainAID,
-				"test_string":  "Steloj estas en ordo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
-			memberResourceData = map[string]interface{}{
-				"id":           resourceID2,
-				"tenant_id":    powerUserTenantID,
-				"domain_id":    domainAID,
-				"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
+
+			setupTestResources()
 
 			fakeIdentity = &middleware.FakeIdentity{}
 		})
@@ -1753,7 +1652,6 @@ var _ = Describe("Resource manager", func() {
 
 	Describe("Running an action on a resource", func() {
 		var (
-			adminResourceData      map[string]interface{}
 			fakeIdentity           middleware.IdentityService
 			fakeAction             schema.Action
 			fakeActionWithoutInput schema.Action
@@ -1762,14 +1660,7 @@ var _ = Describe("Resource manager", func() {
 		BeforeEach(func() {
 			schemaID = "test"
 			action = "create"
-			adminResourceData = map[string]interface{}{
-				"id":           resourceID1,
-				"tenant_id":    adminTenantID,
-				"test_string":  "Steloj estas en ordo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
+			setupTestResources()
 			fakeIdentity = &middleware.FakeIdentity{}
 			inputSchema := map[string]interface{}{
 				"type": "object",
@@ -1822,7 +1713,6 @@ var _ = Describe("Resource manager", func() {
 
 	Describe("Executing a sequence of operations", func() {
 		var (
-			adminResourceData, memberResourceData                                 map[string]interface{}
 			listContext, showContext, deleteContext, createContext, updateContext middleware.Context
 			fakeIdentity                                                          middleware.IdentityService
 		)
@@ -1830,22 +1720,7 @@ var _ = Describe("Resource manager", func() {
 		BeforeEach(func() {
 			schemaID = "test"
 			action = "list"
-			adminResourceData = map[string]interface{}{
-				"id":           resourceID1,
-				"tenant_id":    adminTenantID,
-				"test_string":  "Steloj estas en ordo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
-			memberResourceData = map[string]interface{}{
-				"id":           resourceID2,
-				"tenant_id":    powerUserTenantID,
-				"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
-				"test_number":  0.5,
-				"test_integer": 1,
-				"test_bool":    false,
-			}
+			setupTestResources()
 			listContext = makeContext()
 			showContext = makeContext()
 			deleteContext = makeContext()
