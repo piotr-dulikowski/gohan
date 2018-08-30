@@ -237,19 +237,19 @@ var _ = Describe("Policies", func() {
 	Describe("Tenants", func() {
 		Describe("Creation", func() {
 			It("should create tenant successfully", func() {
-				tenant := newTenant("tenantID", "tenantName")
+				tenant := newTenantMatcher("tenantID", "tenantName")
 				Expect(tenant.ID.String()).To(Equal("tenantID"))
 				Expect(tenant.Name.String()).To(Equal("tenantName"))
 			})
 
 			It("should create tenant with empty id successfully", func() {
-				tenant := newTenant("", "tenantName")
+				tenant := newTenantMatcher("", "tenantName")
 				Expect(tenant.ID.String()).To(Equal(".*"))
 				Expect(tenant.Name.String()).To(Equal("tenantName"))
 			})
 
 			It("should create tenant with empty name successfully", func() {
-				tenant := newTenant("tenantID", "")
+				tenant := newTenantMatcher("tenantID", "")
 				Expect(tenant.ID.String()).To(Equal("tenantID"))
 				Expect(tenant.Name.String()).To(Equal(".*"))
 			})
@@ -257,14 +257,14 @@ var _ = Describe("Policies", func() {
 
 		Describe("Comparing", func() {
 			It("should compare same tenants successfully", func() {
-				tenant := newTenant("tenantID", "tenantName")
+				tenant := newTenantMatcher("tenantID", "tenantName")
 				Expect(tenant.equal(tenant)).To(BeTrue())
 				Expect(tenant.notEqual(tenant)).To(BeFalse())
 			})
 
 			It("should compare different tenants successfully", func() {
-				tenant1 := newTenant("tenantID1", "tenantName1")
-				tenant2 := newTenant("tenantID2", "tenantName2")
+				tenant1 := newTenantMatcher("tenantID1", "tenantName1")
+				tenant2 := newTenantMatcher("tenantID2", "tenantName2")
 				Expect(tenant1.equal(tenant2)).To(BeFalse())
 				Expect(tenant1.notEqual(tenant2)).To(BeTrue())
 				Expect(tenant2.equal(tenant1)).To(BeFalse())
@@ -272,14 +272,14 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should compare same tenants with id only successfully", func() {
-				tenant := newTenant("tenantID", "")
+				tenant := newTenantMatcher("tenantID", "")
 				Expect(tenant.equal(tenant)).To(BeTrue())
 				Expect(tenant.notEqual(tenant)).To(BeFalse())
 			})
 
 			It("should compare different tenants with id only successfully", func() {
-				tenant1 := newTenant("tenantID1", "")
-				tenant2 := newTenant("tenantID2", "")
+				tenant1 := newTenantMatcher("tenantID1", "")
+				tenant2 := newTenantMatcher("tenantID2", "")
 				Expect(tenant1.equal(tenant2)).To(BeFalse())
 				Expect(tenant1.notEqual(tenant2)).To(BeTrue())
 				Expect(tenant2.equal(tenant1)).To(BeFalse())
@@ -287,14 +287,14 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should compare same tenants with name only successfully", func() {
-				tenant := newTenant("", "tenantName")
+				tenant := newTenantMatcher("", "tenantName")
 				Expect(tenant.equal(tenant)).To(BeTrue())
 				Expect(tenant.notEqual(tenant)).To(BeFalse())
 			})
 
 			It("should compare different tenants with name only successfully", func() {
-				tenant1 := newTenant("", "tenantName1")
-				tenant2 := newTenant("", "tenantName2")
+				tenant1 := newTenantMatcher("", "tenantName1")
+				tenant2 := newTenantMatcher("", "tenantName2")
 				Expect(tenant1.equal(tenant2)).To(BeFalse())
 				Expect(tenant1.notEqual(tenant2)).To(BeTrue())
 				Expect(tenant2.equal(tenant1)).To(BeFalse())
@@ -302,8 +302,8 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should compare tenant with both values to id only", func() {
-				tenant1 := newTenant("tenantID", "tenantName")
-				tenant2 := newTenant("tenantID", "")
+				tenant1 := newTenantMatcher("tenantID", "tenantName")
+				tenant2 := newTenantMatcher("tenantID", "")
 				Expect(tenant1.equal(tenant2)).To(BeTrue())
 				Expect(tenant1.notEqual(tenant2)).To(BeFalse())
 				Expect(tenant2.equal(tenant1)).To(BeTrue())
@@ -311,8 +311,8 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should compare tenant with both values to name only", func() {
-				tenant1 := newTenant("tenantID", "tenantName")
-				tenant2 := newTenant("", "tenantName")
+				tenant1 := newTenantMatcher("tenantID", "tenantName")
+				tenant2 := newTenantMatcher("", "tenantName")
 				Expect(tenant1.equal(tenant2)).To(BeTrue())
 				Expect(tenant1.notEqual(tenant2)).To(BeFalse())
 				Expect(tenant2.equal(tenant1)).To(BeTrue())
@@ -340,9 +340,14 @@ var _ = Describe("Policies", func() {
 				},
 			}
 			authorization = BaseAuthorization{
+				scopingType: ScopedToTenant,
 				tenant: Tenant{
 					ID:   "userID",
 					Name: "userName",
+				},
+				domain: Domain {
+					ID: "domainID",
+					Name: "domainName",
 				},
 				authToken: "token",
 				roles:     []*Role{},
@@ -357,6 +362,8 @@ var _ = Describe("Policies", func() {
 				data = map[string]interface{}{
 					"tenant_id":   "userID",
 					"tenant_name": "userName",
+					"domain_id":   "domainID",
+					"domain_name": "domainName",
 				}
 			})
 
@@ -369,7 +376,15 @@ var _ = Describe("Policies", func() {
 				authorization.tenant.ID = "notOwnerID"
 				authorization.tenant.Name = "notOwnerName"
 				err := policy.Check("create", &authorization, data)
-				Expect(err).To(MatchError(getProhibitedError("notOwnerName (notOwnerID)", "userName (userID)")))
+				Expect(err).To(MatchError(getTenantProhibitedError("notOwnerName (notOwnerID)", "userName (userID)")))
+			})
+
+			It("should not pass check - different domain", func() {
+				authorization.scopingType = ScopedToDomain
+				authorization.domain.ID = "otherDomainID"
+				authorization.domain.Name = "otherDomainName"
+				err := policy.Check("create", &authorization, data)
+				Expect(err).To(MatchError(getDomainProhibitedError("otherDomainName (otherDomainID)", "domainName (domainID)")))
 			})
 
 			Describe("Effect property", func() {
@@ -686,6 +701,10 @@ var _ = Describe("Policies", func() {
 	})
 })
 
-func getProhibitedError(caller, owner string) string {
+func getTenantProhibitedError(caller, owner string) string {
 	return fmt.Sprintf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
+}
+
+func getDomainProhibitedError(caller, owner string) string {
+	return fmt.Sprintf("User from domain '%s' is prohibited from operating on resources from domain '%s'", caller, owner)
 }

@@ -53,29 +53,29 @@ const (
 // AllActions are all possible actions
 var AllActions = []string{ActionCreate, ActionRead, ActionUpdate, ActionDelete}
 
-func newTenant(tenantID, tenantName string) tenant {
+func newTenantMatcher(tenantID, tenantName string) tenantMatcher {
 	tenantIDRegexp, _ := getRegexp(tenantID)
 	tenantNameRegexp, _ := getRegexp(tenantName)
-	return tenant{ID: tenantIDRegexp, Name: tenantNameRegexp}
+	return tenantMatcher{ID: tenantIDRegexp, Name: tenantNameRegexp}
 }
 
-// Tenant ...
-type tenant struct {
+// tenantMatcher matches given tenant
+type tenantMatcher struct {
 	ID   *regexp.Regexp
 	Name *regexp.Regexp
 }
 
-func (t *tenant) equal(t2 tenant) bool {
+func (t *tenantMatcher) equal(t2 tenantMatcher) bool {
 	idMatch := t.ID.MatchString(t2.ID.String()) || t2.ID.MatchString(t.ID.String())
 	nameMatch := t.Name.MatchString(t2.Name.String()) || t2.Name.MatchString(t.Name.String())
 	return idMatch && nameMatch
 }
 
-func (t *tenant) notEqual(t2 tenant) bool {
+func (t *tenantMatcher) notEqual(t2 tenantMatcher) bool {
 	return !t.equal(t2)
 }
 
-func (t tenant) String() string {
+func (t tenantMatcher) String() string {
 	return fmt.Sprintf("%s (%s)", t.Name.String(), t.ID.String())
 }
 
@@ -125,7 +125,7 @@ type AttachInfo struct {
 
 type ResourceCondition struct {
 	Condition                     []interface{}
-	actionTenantFilter            map[string][]tenant
+	actionTenantFilter            map[string][]tenantMatcher
 	actionPropertyConditionFilter map[string][]map[string]interface{}
 	actionFilter                  *conditionFilter
 	requireOwner                  bool
@@ -383,7 +383,7 @@ func getStringSliceFromRawSlice(data []interface{}) []string {
 
 func NewResourceCondition(rawCondition []interface{}, policyID string) (*ResourceCondition, error) {
 	p := &ResourceCondition{Condition: rawCondition}
-	p.actionTenantFilter = map[string][]tenant{}
+	p.actionTenantFilter = map[string][]tenantMatcher{}
 	p.actionPropertyConditionFilter = map[string][]map[string]interface{}{}
 	for _, condition := range p.Condition {
 		switch condition.(type) {
@@ -420,7 +420,7 @@ func NewResourceCondition(rawCondition []interface{}, policyID string) (*Resourc
 					}
 
 					for _, action := range actions {
-						p.addTenantToFilter(action, tenant{ID: tenantID, Name: tenantName})
+						p.addTenantToFilter(action, tenantMatcher{ID: tenantID, Name: tenantName})
 					}
 				case conditionProperty:
 					actions := AllActions
@@ -460,8 +460,8 @@ func NewResourceCondition(rawCondition []interface{}, policyID string) (*Resourc
 	return p, nil
 }
 
-// addTenantToFilter adds tenant to filter for given action
-func (p *ResourceCondition) addTenantToFilter(action string, tenant tenant) {
+// addTenantToFilter adds tenantMatcher to filter for given action
+func (p *ResourceCondition) addTenantToFilter(action string, tenant tenantMatcher) {
 	p.actionTenantFilter[action] = append(p.actionTenantFilter[action], tenant)
 }
 
@@ -543,13 +543,26 @@ func (p *Policy) FilterSchema(
 func (p *Policy) Check(action string, authorization Authorization, data map[string]interface{}) error {
 	currCond := p.GetCurrentResourceCondition()
 	if currCond.RequireOwner() {
-		ownerID, _ := data["tenant_id"].(string)
-		ownerName, _ := data["tenant_name"].(string)
-		owner := newTenant(ownerID, ownerName)
-		caller := newTenant(authorization.TenantID(), authorization.TenantName())
+		if authorization.ScopingType() == ScopedToTenant {
+			ownerID, _ := data["tenant_id"].(string)
+			ownerName, _ := data["tenant_name"].(string)
+			owner := newTenantMatcher(ownerID, ownerName)
+			caller := newTenantMatcher(authorization.TenantID(), authorization.TenantName())
 
-		if caller.notEqual(owner) && !currCond.isTenantAllowed(action, owner, caller) {
-			return fmt.Errorf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
+			if caller.notEqual(owner) && !currCond.isTenantAllowed(action, owner, caller) {
+				return fmt.Errorf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
+			}
+		}
+
+		if authorization.DomainID() != "" {
+			resourceDomainID, setsDomain := data["domain_id"].(string)
+			resourceDomainName, _ := data["domain_name"].(string)
+			if setsDomain && authorization.DomainID() != resourceDomainID {
+				return fmt.Errorf("User from domain '%s (%s)' is prohibited from operating on resources from domain '%s (%s)'",
+					authorization.DomainName(), authorization.DomainID(),
+					resourceDomainName, resourceDomainID,
+				)
+			}
 		}
 	}
 
@@ -640,15 +653,15 @@ func (p *ResourceCondition) GetTenantAndDomainFilters(action string, auth Author
 	return
 }
 
-// getTenantFilter returns tenants filter for the action performed by the tenant
-func (p *ResourceCondition) getTenantFilter(action string, tenant tenant) []tenant {
+// getTenantFilter returns tenants filter for the action performed by the tenantMatcher
+func (p *ResourceCondition) getTenantFilter(action string, tenant tenantMatcher) []tenantMatcher {
 	if !p.requireOwner {
 		return nil
 	}
 	return append(p.actionTenantFilter[action], tenant)
 }
 
-func (p *ResourceCondition) isTenantAllowed(action string, owner, tenant tenant) bool {
+func (p *ResourceCondition) isTenantAllowed(action string, owner, tenant tenantMatcher) bool {
 	for _, allowedTenant := range p.getTenantFilter(action, tenant) {
 		if owner.equal(allowedTenant) {
 			return true
