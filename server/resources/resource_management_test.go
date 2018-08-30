@@ -1126,7 +1126,7 @@ var _ = Describe("Resource manager", func() {
 				DescribeTable("Should create resource in current domain",
 					func(resourceData *map[string]interface{}) {
 						err := resources.CreateResource(
-							context, testDB, fakeIdentity, currentSchema, adminResourceData)
+							context, testDB, fakeIdentity, currentSchema, *resourceData)
 						result := context["response"].(map[string]interface{})
 						Expect(err).NotTo(HaveOccurred())
 						Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(*resourceData)))
@@ -1493,6 +1493,10 @@ var _ = Describe("Resource manager", func() {
 			})
 
 			Context("As a domain-scoped user", func() {
+				BeforeEach(func() {
+					auth = domainScopedAuth
+				})
+
 				DescribeTable("Should update resource in current domain",
 					func(resourceID string) {
 						err := resources.UpdateResource(

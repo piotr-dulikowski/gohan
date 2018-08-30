@@ -614,12 +614,17 @@ func CreateResource(
 		dataMap["domain_id"] = context["domain_id"]
 	}
 
+	if domainID, ok := dataMap["domain_id"]; ok && domainID != nil {
+		dataMap["domain_name"] = context["domain_name"]
+	}
+
 	//Apply policy for api input
 	err = policy.Check(schema.ActionCreate, auth, dataMap)
 	if err != nil {
 		return ResourceError{err, err.Error(), Unauthorized}
 	}
 	delete(dataMap, "tenant_name")
+	delete(dataMap, "domain_name")
 
 	// apply property filter
 	currCond := policy.GetCurrentResourceCondition()
@@ -756,10 +761,14 @@ func UpdateResource(
 	if tenantID, ok := dataMap["tenant_id"]; ok && tenantID != nil {
 		dataMap["tenant_name"] = context["tenant_name"]
 	}
+	if domainID, ok := dataMap["domain_id"]; ok && domainID != nil {
+		dataMap["domain_name"] = context["domain_name"]
+	}
 
 	//check policy
 	err = policy.Check(schema.ActionUpdate, auth, dataMap)
 	delete(dataMap, "tenant_name")
+	delete(dataMap, "domain_name")
 	if err != nil {
 		return ResourceError{err, err.Error(), Unauthorized}
 	}
