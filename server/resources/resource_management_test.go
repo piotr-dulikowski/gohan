@@ -40,24 +40,26 @@ var _ = Describe("Resource manager", func() {
 	const (
 		resourceID1 = "6660fbf8-ca60-4cb0-a42e-9a913beafbaf"
 		resourceID2 = "6660fbf8-ca60-4cb0-a42e-9a913beafbae"
+		resourceID3 = "6660fbf8-ca60-4cb0-a42e-9a913beafbad"
 	)
 
 	var (
-		manager       *schema.Manager
-		adminAuth     schema.Authorization
-		memberAuth    schema.Authorization
-		auth          schema.Authorization
-		context       middleware.Context
-		schemaID      string
-		path          string
-		action        string
-		currentSchema *schema.Schema
-		extensions    []*schema.Extension
-		env           extension.Environment
-		events        map[string]string
-		timeLimit     time.Duration
-		timeLimits    []*schema.PathEventTimeLimit
-		ctx           context_pkg.Context
+		manager          *schema.Manager
+		adminAuth        schema.Authorization
+		memberAuth       schema.Authorization
+		domainScopedAuth schema.Authorization
+		auth             schema.Authorization
+		context          middleware.Context
+		schemaID         string
+		path             string
+		action           string
+		currentSchema    *schema.Schema
+		extensions       []*schema.Extension
+		env              extension.Environment
+		events           map[string]string
+		timeLimit        time.Duration
+		timeLimits       []*schema.PathEventTimeLimit
+		ctx              context_pkg.Context
 	)
 
 	BeforeEach(func() {
@@ -71,6 +73,7 @@ var _ = Describe("Resource manager", func() {
 
 		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, domainA, adminTokenID, []string{"admin"}, nil)
 		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, domainA, memberTokenID, []string{"Member"}, nil)
+		domainScopedAuth = schema.NewScopedToDomainAuthorization(domainA, powerUserTokenID, []string{"Member"}, nil)
 		auth = adminAuth
 		context = middleware.Context{
 			"context": ctx,
@@ -387,7 +390,7 @@ var _ = Describe("Resource manager", func() {
 
 		Describe("When there are resources in the database", func() {
 			var (
-				adminResourceData, memberResourceData map[string]interface{}
+				adminResourceData, memberResourceData, otherDomainResourceData map[string]interface{}
 			)
 
 			BeforeEach(func() {
@@ -409,6 +412,15 @@ var _ = Describe("Resource manager", func() {
 					"test_integer": 1,
 					"test_bool":    false,
 				}
+				otherDomainResourceData = map[string]interface{}{
+					"id":           resourceID3,
+					"tenant_id":    memberTenantID,
+					"domain_id":    domainBID,
+					"test_string":  "Mi estas tekruĉo.",
+					"test_number":  0.5,
+					"test_integer": 1,
+					"test_bool":    false,
+				}
 			})
 
 			JustBeforeEach(func() {
@@ -416,11 +428,14 @@ var _ = Describe("Resource manager", func() {
 				Expect(err).NotTo(HaveOccurred())
 				memberResource, err := manager.LoadResource(currentSchema.ID, memberResourceData)
 				Expect(err).NotTo(HaveOccurred())
+				otherDomainResource, err := manager.LoadResource(currentSchema.ID, otherDomainResourceData)
+				Expect(err).NotTo(HaveOccurred())
 				transaction, err := testDB.BeginTx()
 				Expect(err).NotTo(HaveOccurred())
 				defer transaction.Close()
 				Expect(transaction.Create(ctx, adminResource)).To(Succeed())
 				Expect(transaction.Create(ctx, memberResource)).To(Succeed())
+				Expect(transaction.Create(ctx, otherDomainResource)).To(Succeed())
 				Expect(transaction.Commit()).To(Succeed())
 			})
 
@@ -431,8 +446,8 @@ var _ = Describe("Resource manager", func() {
 					result := context["response"].(map[string]interface{})
 					number := context["total"].(uint64)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(number).To(Equal(uint64(2)))
-					Expect(result).To(HaveKeyWithValue("tests", ConsistOf(adminResourceData, memberResourceData)))
+					Expect(number).To(Equal(uint64(3)))
+					Expect(result).To(HaveKeyWithValue("tests", ConsistOf(adminResourceData, memberResourceData, otherDomainResourceData)))
 				})
 			})
 
@@ -450,6 +465,23 @@ var _ = Describe("Resource manager", func() {
 					Expect(err).NotTo(HaveOccurred())
 					Expect(number).To(Equal(uint64(1)))
 					Expect(result).To(HaveKeyWithValue("tests", ConsistOf(adminResourceData)))
+				})
+			})
+
+			Context("As a domain-scoped user", func() {
+				BeforeEach(func() {
+					auth = domainScopedAuth
+				})
+
+				It("Should return resources only from the scoped domain", func() {
+					err := resources.GetMultipleResources(
+						context, testDB, currentSchema, map[string][]string{})
+
+					result := context["response"].(map[string]interface{})
+					number := context["total"].(uint64)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(number).To(Equal(uint64(2)))
+					Expect(result).To(HaveKeyWithValue("tests", ConsistOf(adminResourceData, memberResourceData)))
 				})
 			})
 		})
@@ -816,6 +848,7 @@ var _ = Describe("Resource manager", func() {
 				adminResourceData = map[string]interface{}{
 					"id":           resourceID1,
 					"tenant_id":    adminTenantID,
+					"domain_id":    domainAID,
 					"test_string":  "Steloj estas en ordo.",
 					"test_number":  0.5,
 					"test_integer": 1,
@@ -824,6 +857,7 @@ var _ = Describe("Resource manager", func() {
 				memberResourceData = map[string]interface{}{
 					"id":           resourceID2,
 					"tenant_id":    powerUserTenantID,
+					"domain_id":    domainAID,
 					"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
 					"test_number":  0.5,
 					"test_integer": 1,
@@ -852,7 +886,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should delete not owned resource", func() {
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID1)).To(Succeed())
+						context, testDB, currentSchema, resourceID2)).To(Succeed())
 				})
 			})
 
@@ -1191,6 +1225,7 @@ var _ = Describe("Resource manager", func() {
 			adminResourceData = map[string]interface{}{
 				"id":           resourceID1,
 				"tenant_id":    adminTenantID,
+				"domain_id":    domainAID,
 				"test_string":  "Steloj estas en ordo.",
 				"test_number":  0.5,
 				"test_integer": 1,
@@ -1199,6 +1234,7 @@ var _ = Describe("Resource manager", func() {
 			memberResourceData = map[string]interface{}{
 				"id":           resourceID2,
 				"tenant_id":    powerUserTenantID,
+				"domain_id":    domainAID,
 				"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
 				"test_number":  0.5,
 				"test_integer": 1,
@@ -1443,8 +1479,8 @@ var _ = Describe("Resource manager", func() {
 					err := resources.UpdateResource(
 						context, testDB, fakeIdentity, currentSchema, resourceID1,
 						map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
-					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
+					result := context["response"].(map[string]interface{})
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
 					Expect(theResource).To(HaveKeyWithValue("test_string", "Steloj ne estas en ordo."))
@@ -1454,11 +1490,11 @@ var _ = Describe("Resource manager", func() {
 					err := resources.UpdateResource(
 						context, testDB, fakeIdentity, currentSchema, resourceID2,
 						map[string]interface{}{"test_string": "Ia, ia, HWCBN fhtang!"})
-					resource, _ := context["response"].(map[string]interface{})
-					Expect(resource).To(BeNil())
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
+					resource, _ := context["response"].(map[string]interface{})
+					Expect(resource).To(BeNil())
 				})
 			})
 
