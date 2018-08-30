@@ -260,41 +260,45 @@ var _ = Describe("Keystone client", func() {
 					Expect(err).To(BeNil())
 					Expect(auth.TenantID()).To(Equal("acme-id"))
 					Expect(auth.TenantName()).To(Equal("acme"))
+					Expect(auth.DomainID()).To(Equal("domain-id"))
+					Expect(auth.DomainName()).To(Equal("domain"))
 					Expect(auth.Roles()).To(Equal([]*schema.Role{{"member"}}))
 				})
 			})
 		})
 	})
 
-	Context("Token scope (Keystone v3)", func() {
+	Context("Token scope", func() {
 		var token = "token"
 
-		It("Should read tokens with tenant scope", func() {
-			server.AppendHandlers(
-				ghttp.RespondWithJSONEncoded(201, getV3TokensScopedToTenantResponse()),
-				ghttp.RespondWithJSONEncoded(200, getV3TokensScopedToTenantResponse()),
-			)
-			setupV3Client()
-			auth, err := client.VerifyToken(token)
-			Expect(err).To(BeNil())
-			Expect(auth.ScopingType()).To(Equal(schema.ScopedToTenant))
-			Expect(auth.TenantID()).To(Equal("acme-id"))
-			Expect(auth.TenantName()).To(Equal("acme"))
-			Expect(auth.DomainID()).To(Equal("default-id"))
-			Expect(auth.DomainName()).To(Equal("default"))
-		})
+		Describe("Keystone v3", func() {
+			It("Should read tokens with tenant scope", func() {
+				server.AppendHandlers(
+					ghttp.RespondWithJSONEncoded(201, getV3TokensScopedToTenantResponse()),
+					ghttp.RespondWithJSONEncoded(200, getV3TokensScopedToTenantResponse()),
+				)
+				setupV3Client()
+				auth, err := client.VerifyToken(token)
+				Expect(err).To(BeNil())
+				Expect(auth.ScopingType()).To(Equal(schema.ScopedToTenant))
+				Expect(auth.TenantID()).To(Equal("acme-id"))
+				Expect(auth.TenantName()).To(Equal("acme"))
+				Expect(auth.DomainID()).To(Equal("domain-id"))
+				Expect(auth.DomainName()).To(Equal("domain"))
+			})
 
-		It("Should read tokens with domain scope", func() {
-			server.AppendHandlers(
-				ghttp.RespondWithJSONEncoded(201, getV3TokensScopedToDomainResponse()),
-				ghttp.RespondWithJSONEncoded(200, getV3TokensScopedToDomainResponse()),
-			)
-			setupV3Client()
-			auth, err := client.VerifyToken(token)
-			Expect(err).To(BeNil())
-			Expect(auth.ScopingType()).To(Equal(schema.ScopedToDomain))
-			Expect(auth.DomainID()).To(Equal("default-id"))
-			Expect(auth.DomainName()).To(Equal("default"))
+			It("Should read tokens with domain scope", func() {
+				server.AppendHandlers(
+					ghttp.RespondWithJSONEncoded(201, getV3TokensScopedToDomainResponse()),
+					ghttp.RespondWithJSONEncoded(200, getV3TokensScopedToDomainResponse()),
+				)
+				setupV3Client()
+				auth, err := client.VerifyToken(token)
+				Expect(err).To(BeNil())
+				Expect(auth.ScopingType()).To(Equal(schema.ScopedToDomain))
+				Expect(auth.DomainID()).To(Equal("domain-id"))
+				Expect(auth.DomainName()).To(Equal("domain"))
+			})
 		})
 	})
 })

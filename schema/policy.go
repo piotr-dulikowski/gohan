@@ -245,6 +245,11 @@ type Domain struct {
 	Name string
 }
 
+var DefaultDomain = Domain{
+	ID:   "default",
+	Name: "default",
+}
+
 //Role describes user role
 type Role struct {
 	Name string
@@ -554,15 +559,13 @@ func (p *Policy) Check(action string, authorization Authorization, data map[stri
 			}
 		}
 
-		if authorization.DomainID() != "" {
-			resourceDomainID, setsDomain := data["domain_id"].(string)
-			resourceDomainName, _ := data["domain_name"].(string)
-			if setsDomain && authorization.DomainID() != resourceDomainID {
-				return fmt.Errorf("User from domain '%s (%s)' is prohibited from operating on resources from domain '%s (%s)'",
-					authorization.DomainName(), authorization.DomainID(),
-					resourceDomainName, resourceDomainID,
-				)
-			}
+		resourceDomainID, setsDomain := data["domain_id"].(string)
+		resourceDomainName, _ := data["domain_name"].(string)
+		if setsDomain && authorization.DomainID() != resourceDomainID {
+			return fmt.Errorf("User from domain '%s (%s)' is prohibited from operating on resources from domain '%s (%s)'",
+				authorization.DomainName(), authorization.DomainID(),
+				resourceDomainName, resourceDomainID,
+			)
 		}
 	}
 
@@ -647,9 +650,7 @@ func (p *ResourceCondition) GetTenantAndDomainFilters(action string, auth Author
 		tenantFilter = append(tenantFilter, auth.TenantID())
 	}
 
-	if auth.DomainID() != "" {
-		domainFilter = []string{auth.DomainID()}
-	}
+	domainFilter = []string{auth.DomainID()}
 	return
 }
 

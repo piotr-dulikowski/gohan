@@ -316,7 +316,7 @@ func GetMultipleResources(context middleware.Context, dataStore db.DB, resourceS
 	currCond := policy.GetCurrentResourceCondition()
 
 	filter := FilterFromQueryParameter(resourceSchema, queryParameters)
-	extendFilterByTenantAndDomain(filter, schema.ActionRead, currCond, auth)
+	extendFilterByTenantAndDomain(resourceSchema, filter, schema.ActionRead, currCond, auth)
 	filter = policy.RemoveHiddenProperty(filter)
 	currCond.AddCustomFilters(filter, auth)
 
@@ -455,10 +455,10 @@ func GetSingleResourceInTransaction(context middleware.Context, resourceSchema *
 		return fmt.Errorf("extension returned invalid JSON: %v", rawResponse)
 	}
 	filter := transaction.IDFilter(resourceID)
-	if tenantIDs != nil {
+	if _, err := resourceSchema.GetPropertyByID("tenant_id"); err == nil && tenantIDs != nil {
 		filter["tenant_id"] = tenantIDs
 	}
-	if domainIDs != nil {
+	if _, err := resourceSchema.GetPropertyByID("domain_id"); err == nil && domainIDs != nil {
 		filter["domain_id"] = domainIDs
 	}
 
@@ -558,7 +558,7 @@ func checkIfResourceExistsForTenant(
 	filter := transaction.IDFilter(resourceID)
 
 	currCond := policy.GetCurrentResourceCondition()
-	extendFilterByTenantAndDomain(filter, schema.ActionUpdate, currCond, auth)
+	extendFilterByTenantAndDomain(resourceSchema, filter, schema.ActionUpdate, currCond, auth)
 	currCond.AddCustomFilters(filter, auth)
 
 	return checkIfResourceExists(context, filter, resourceSchema, preTransaction)
@@ -823,10 +823,10 @@ func UpdateResourceInTransaction(
 		return fmt.Errorf("No environment for schema")
 	}
 	filter := transaction.IDFilter(resourceID)
-	if tenantIDs != nil {
+	if _, err := resourceSchema.GetPropertyByID("tenant_id"); err == nil && tenantIDs != nil {
 		filter["tenant_id"] = tenantIDs
 	}
-	if domainIDs != nil {
+	if _, err := resourceSchema.GetPropertyByID("domain_id"); err == nil && domainIDs != nil {
 		filter["domain_id"] = domainIDs
 	}
 
@@ -987,7 +987,7 @@ func fetchResourceForAction(action string, auth schema.Authorization, resourceID
 	}
 	currCond := policy.GetCurrentResourceCondition()
 	filter := transaction.IDFilter(resourceID)
-	extendFilterByTenantAndDomain(filter, action, currCond, auth)
+	extendFilterByTenantAndDomain(resourceSchema, filter, action, currCond, auth)
 	currCond.AddCustomFilters(filter, auth)
 	resource, err := tx.Fetch(mustGetContext(context), resourceSchema, filter, nil)
 	if err != nil {
@@ -1012,7 +1012,7 @@ func DeleteResourceInTransaction(context middleware.Context, resourceSchema *sch
 	policy := context["policy"].(*schema.Policy)
 	currCond := policy.GetCurrentResourceCondition()
 	filter := transaction.IDFilter(resourceID)
-	extendFilterByTenantAndDomain(filter, schema.ActionDelete, currCond, auth)
+	extendFilterByTenantAndDomain(resourceSchema, filter, schema.ActionDelete, currCond, auth)
 
 	var resource *schema.Resource
 	var err error
@@ -1123,12 +1123,16 @@ func errorBadRequest(schemaId, resourceId string) error {
 	return goext.NewErrorBadRequest(relatedResourceNotFoundErr(schemaId, resourceId))
 }
 
-func extendFilterByTenantAndDomain(filter transaction.Filter, action string, rc *schema.ResourceCondition, auth schema.Authorization) {
+func extendFilterByTenantAndDomain(
+	schema *schema.Schema,
+	filter transaction.Filter, action string,
+	rc *schema.ResourceCondition, auth schema.Authorization,
+) {
 	tenantFilter, domainFilter := rc.GetTenantAndDomainFilters(action, auth)
-	if len(tenantFilter) > 0 {
+	if _, err := schema.GetPropertyByID("tenant_id"); err == nil && len(tenantFilter) > 0 {
 		filter["tenant_id"] = tenantFilter
 	}
-	if len(domainFilter) > 0 {
+	if _, err := schema.GetPropertyByID("domain_id"); err == nil && len(domainFilter) > 0 {
 		filter["domain_id"] = domainFilter
 	}
 }
@@ -1154,7 +1158,7 @@ func validateAttachmentRelation(
 
 	otherCond := policy.GetOtherResourceCondition()
 	filter := transaction.IDFilter(relatedResourceID)
-	extendFilterByTenantAndDomain(filter, schema.ActionRead, otherCond, auth)
+	extendFilterByTenantAndDomain(relatedSchema, filter, schema.ActionRead, otherCond, auth)
 	otherCond.AddCustomFilters(filter, auth)
 
 	options := &transaction.ViewOptions{}
