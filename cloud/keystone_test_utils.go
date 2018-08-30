@@ -58,8 +58,8 @@ func getV3TokensScopedToTenantResponse() interface{} {
 			"catalog": []interface{}{},
 			"project": map[string]interface{}{
 				"domain": map[string]interface{}{
-					"id":   "default-id",
-					"name": "default",
+					"id":   "domain-id",
+					"name": "domain",
 				},
 				"id":   "acme-id",
 				"name": "acme",
@@ -92,8 +92,8 @@ func getV3TokensScopedToDomainResponse() interface{} {
 			},
 			"catalog": []interface{}{},
 			"domain": map[string]interface{}{
-				"id":   "default-id",
-				"name": "default",
+				"id":   "domain-id",
+				"name": "domain",
 			},
 		},
 	}

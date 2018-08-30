@@ -40,8 +40,8 @@ var _ = Describe("Policies", func() {
 			Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 			Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
-			adminAuth = NewScopedToTenantAuthorization(Tenant{ID: adminTenantID, Name: "admin"}, Domain{}, "fake_token", []string{"admin"}, nil)
-			memberAuth = NewScopedToTenantAuthorization(Tenant{ID: demoTenantID, Name: "demo"}, Domain{}, "fake_token", []string{"Member"}, nil)
+			adminAuth = NewScopedToTenantAuthorization(Tenant{ID: adminTenantID, Name: "admin"}, DefaultDomain, "fake_token", []string{"admin"}, nil)
+			memberAuth = NewScopedToTenantAuthorization(Tenant{ID: demoTenantID, Name: "demo"}, DefaultDomain, "fake_token", []string{"Member"}, nil)
 		})
 
 		AfterEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("Policies", func() {
 			}
 
 			tenant := Tenant{ID: "xyz", Name: "xyz"}
-			xyzAuth = NewScopedToTenantAuthorization(tenant, Domain{}, "token", []string{"Member"}, nil)
+			xyzAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, "token", []string{"Member"}, nil)
 		})
 
 		It("should return error on both types of properties", func() {
@@ -536,7 +536,7 @@ var _ = Describe("Policies", func() {
 
 			BeforeEach(func() {
 				tenant := Tenant{ID: "test", Name: "test"}
-				testAuth = NewScopedToTenantAuthorization(tenant, Domain{}, "token", []string{"Member"}, nil)
+				testAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, "token", []string{"Member"}, nil)
 			})
 
 			It("should work with string condition based on conjunction property", func() {

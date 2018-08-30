@@ -35,7 +35,7 @@ func TestGetSchema(t *testing.T) {
 		t.Error(err)
 	}
 
-	a := schema.NewScopedToTenantAuthorization(schema.Tenant{ID: "member", Name: "member"}, schema.Domain{}, "member", []string{"Member"}, nil)
+	a := schema.NewScopedToTenantAuthorization(schema.Tenant{ID: "member", Name: "member"}, schema.DefaultDomain, "member", []string{"Member"}, nil)
 	s, ok := manager.Schema("member_resource")
 	if !ok {
 		t.Error("Could not find schema")

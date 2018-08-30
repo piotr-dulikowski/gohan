@@ -322,7 +322,7 @@ func (client *keystoneV2Client) VerifyToken(token string) (schema.Authorization,
 		}
 		catalogObj = append(catalogObj, schema.NewCatalog(catalog["name"].(string), catalog["type"].(string), endPoints))
 	}
-	return schema.NewScopedToTenantAuthorization(schema.Tenant{ID: tenantID, Name: tenantName}, schema.Domain{}, token, roleIDs, catalogObj), nil
+	return schema.NewScopedToTenantAuthorization(schema.Tenant{ID: tenantID, Name: tenantName}, schema.DefaultDomain, token, roleIDs, catalogObj), nil
 }
 
 // GetTenantID maps the given v2.0 project name to the tenant's id

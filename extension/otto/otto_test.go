@@ -645,7 +645,7 @@ var _ = Describe("Otto extension manager", func() {
 		)
 
 		BeforeEach(func() {
-			adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.Domain{}, adminTokenID, []string{"admin"}, nil)
+			adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.DefaultDomain, adminTokenID, []string{"admin"}, nil)
 			auth = adminAuth
 
 			context = makeContext()

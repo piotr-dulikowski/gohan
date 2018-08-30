@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("Cached identity service", func() {
 			Name: "tenant-name",
 		}
 		token = "token"
-		auth = schema.NewScopedToTenantAuthorization(tenant, schema.Domain{}, token, []string{}, []*schema.Catalog{})
+		auth = schema.NewScopedToTenantAuthorization(tenant, schema.DefaultDomain, token, []string{}, []*schema.Catalog{})
 	})
 
 	ginkgo.AfterEach(func() {
