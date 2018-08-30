@@ -79,9 +79,16 @@ var _ = Describe("Policies", func() {
 
 	Describe("Creation", func() {
 		var (
-			manager    *Manager
-			testPolicy map[string]interface{}
+			manager      *Manager
+			testPolicy   map[string]interface{}
+			someTenantID = "acf5662bbff44060b93ac3db3c25a590"
+			xyzAuth      Authorization
 		)
+
+		getTenantIDFilter := func(rc *ResourceCondition, action string, auth Authorization) []string {
+			tenantIDs, _ := rc.GetTenantAndDomainFilters(action, auth)
+			return tenantIDs
+		}
 
 		BeforeEach(func() {
 			manager = GetManager()
@@ -94,6 +101,9 @@ var _ = Describe("Policies", func() {
 					"path": ".*",
 				},
 			}
+
+			tenant := Tenant{ID: "xyz", Name: "xyz"}
+			xyzAuth = NewScopedToTenantAuthorization(tenant, Domain{}, "token", []string{"Member"}, nil)
 		})
 
 		It("should return error on both types of properties", func() {
@@ -134,12 +144,12 @@ var _ = Describe("Policies", func() {
 				"is_owner",
 				map[string]interface{}{
 					"action":    "read",
-					"tenant_id": "acf5662bbff44060b93ac3db3c25a590",
+					"tenant_id": someTenantID,
 					"type":      "belongs_to",
 				},
 				map[string]interface{}{
 					"action":    "update",
-					"tenant_id": "acf5662bbff44060b93ac3db3c25a590",
+					"tenant_id": someTenantID,
 					"type":      "belongs_to",
 				},
 			}
@@ -147,10 +157,10 @@ var _ = Describe("Policies", func() {
 			Expect(err).NotTo(HaveOccurred())
 			currCond := policy.GetCurrentResourceCondition()
 			Expect(currCond.RequireOwner()).To(BeTrue())
-			Expect(currCond.GetTenantIDFilter("create", "xyz")).To(ConsistOf("xyz"))
-			Expect(currCond.GetTenantIDFilter("read", "xyz")).To(ConsistOf("xyz", "acf5662bbff44060b93ac3db3c25a590"))
-			Expect(currCond.GetTenantIDFilter("update", "xyz")).To(ConsistOf("xyz", "acf5662bbff44060b93ac3db3c25a590"))
-			Expect(currCond.GetTenantIDFilter("delete", "xyz")).To(ConsistOf("xyz"))
+			Expect(getTenantIDFilter(currCond, "create", xyzAuth)).To(ConsistOf("xyz"))
+			Expect(getTenantIDFilter(currCond, "read", xyzAuth)).To(ConsistOf("xyz", someTenantID))
+			Expect(getTenantIDFilter(currCond, "update", xyzAuth)).To(ConsistOf("xyz", someTenantID))
+			Expect(getTenantIDFilter(currCond, "delete", xyzAuth)).To(ConsistOf("xyz"))
 		})
 
 		It("tests glob action", func() {
@@ -158,7 +168,7 @@ var _ = Describe("Policies", func() {
 				"is_owner",
 				map[string]interface{}{
 					"action":    "*",
-					"tenant_id": "acf5662bbff44060b93ac3db3c25a590",
+					"tenant_id": someTenantID,
 					"type":      "belongs_to",
 				},
 			}
@@ -166,10 +176,10 @@ var _ = Describe("Policies", func() {
 			Expect(err).NotTo(HaveOccurred())
 			currCond := policy.GetCurrentResourceCondition()
 			Expect(currCond.RequireOwner()).To(BeTrue())
-			Expect(currCond.GetTenantIDFilter("create", "xyz")).To(ConsistOf("xyz", "acf5662bbff44060b93ac3db3c25a590"))
-			Expect(currCond.GetTenantIDFilter("read", "xyz")).To(ConsistOf("xyz", "acf5662bbff44060b93ac3db3c25a590"))
-			Expect(currCond.GetTenantIDFilter("update", "xyz")).To(ConsistOf("xyz", "acf5662bbff44060b93ac3db3c25a590"))
-			Expect(currCond.GetTenantIDFilter("delete", "xyz")).To(ConsistOf("xyz", "acf5662bbff44060b93ac3db3c25a590"))
+			Expect(getTenantIDFilter(currCond, "create", xyzAuth)).To(ConsistOf("xyz", someTenantID))
+			Expect(getTenantIDFilter(currCond, "read", xyzAuth)).To(ConsistOf("xyz", someTenantID))
+			Expect(getTenantIDFilter(currCond, "update", xyzAuth)).To(ConsistOf("xyz", someTenantID))
+			Expect(getTenantIDFilter(currCond, "delete", xyzAuth)).To(ConsistOf("xyz", someTenantID))
 		})
 
 		Describe("'__attach__' policy", func() {
@@ -330,13 +340,13 @@ var _ = Describe("Policies", func() {
 				},
 			}
 			authorization = BaseAuthorization{
-				tenant: Tenant {
-					ID: "userID",
+				tenant: Tenant{
+					ID:   "userID",
 					Name: "userName",
 				},
-				authToken:  "token",
-				roles:      []*Role{},
-				catalog:    []*Catalog{},
+				authToken: "token",
+				roles:     []*Role{},
+				catalog:   []*Catalog{},
 			}
 		})
 
