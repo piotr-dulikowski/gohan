@@ -600,12 +600,20 @@ var _ = Describe("Resource manager", func() {
 					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(adminResourceData)))
 				})
 
-				It("Should return not owned resource", func() {
+				It("Should return not owned resource from the same domain", func() {
 					err := resources.GetSingleResource(
 						context, testDB, currentSchema, resourceID2)
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(memberResourceData)))
+				})
+
+				It("Should return resource from other domain", func() {
+					err := resources.GetSingleResource(
+						context, testDB, currentSchema, resourceID3)
+					result := context["response"].(map[string]interface{})
+					Expect(err).NotTo(HaveOccurred())
+					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(otherDomainResourceData)))
 				})
 			})
 
@@ -625,6 +633,28 @@ var _ = Describe("Resource manager", func() {
 				It("Should not return not owned resource", func() {
 					err := resources.GetSingleResource(
 						context, testDB, currentSchema, resourceID2)
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
+				})
+			})
+
+			Context("As a domain-scoped user", func() {
+				BeforeEach(func() {
+					auth = domainScopedAuth
+				})
+
+				It("Should return resource from the same domain", func() {
+					err := resources.GetSingleResource(
+						context, testDB, currentSchema, resourceID1)
+					Expect(err).ToNot(HaveOccurred())
+					result := context["response"].(map[string]interface{})
+					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(adminResourceData)))
+				})
+
+				It("Should not return resource from other domain", func() {
+					err := resources.GetSingleResource(
+						context, testDB, currentSchema, resourceID3)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
