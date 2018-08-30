@@ -507,6 +507,13 @@ var _ = Describe("Policies", func() {
 		})
 
 		Describe("Custom filter", func() {
+			var testAuth Authorization
+
+			BeforeEach(func() {
+				tenant := Tenant{ID: "test", Name: "test"}
+				testAuth = NewScopedToTenantAuthorization(tenant, Domain{}, "token", []string{"Member"}, nil)
+			})
+
 			It("should work with string condition based on conjunction property", func() {
 				testPolicy["condition"] = []interface{}{
 					map[string]interface{}{
@@ -534,7 +541,7 @@ var _ = Describe("Policies", func() {
 				Expect(err).ToNot(HaveOccurred())
 				filter := map[string]interface{}{}
 				currCond := policy.GetCurrentResourceCondition()
-				currCond.AddCustomFilters(filter, "test")
+				currCond.AddCustomFilters(filter, testAuth)
 				expected := map[string]interface{}{
 					"__and__": []map[string]interface{}{
 						{
@@ -578,7 +585,7 @@ var _ = Describe("Policies", func() {
 				Expect(err).ToNot(HaveOccurred())
 				filter := map[string]interface{}{}
 				currCond := policy.GetCurrentResourceCondition()
-				currCond.AddCustomFilters(filter, "test")
+				currCond.AddCustomFilters(filter, testAuth)
 				expected := map[string]interface{}{
 					"__or__": []map[string]interface{}{
 						{
@@ -633,9 +640,8 @@ var _ = Describe("Policies", func() {
 				policy, err = NewPolicy(testPolicy)
 				Expect(err).ToNot(HaveOccurred())
 				filter := map[string]interface{}{}
-				tenantID := "test"
 				currCond := policy.GetCurrentResourceCondition()
-				currCond.AddCustomFilters(filter, tenantID)
+				currCond.AddCustomFilters(filter, testAuth)
 				expected := map[string]interface{}{
 					"__or__": []map[string]interface{}{
 						{
@@ -653,7 +659,7 @@ var _ = Describe("Policies", func() {
 								{
 									"property": "tenant_id",
 									"type":     "eq",
-									"value":    tenantID,
+									"value":    testAuth.TenantID(),
 								},
 								{
 									"property": "state",

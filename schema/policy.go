@@ -139,6 +139,7 @@ type resourceFilter struct {
 
 //ScopingType describes how the authorization is scoped
 type ScopingType string
+
 const (
 	ScopedToTenant ScopingType = "to_tenant"
 	ScopedToDomain ScopingType = "to_domain"
@@ -230,13 +231,13 @@ func (auth *BaseAuthorization) Catalog() []*Catalog {
 	return auth.catalog
 }
 
-func (auth* BaseAuthorization) ScopingType() ScopingType {
+func (auth *BaseAuthorization) ScopingType() ScopingType {
 	return auth.scopingType
 }
 
 type Tenant struct {
-	ID     string
-	Name   string
+	ID   string
+	Name string
 }
 
 type Domain struct {
@@ -621,16 +622,22 @@ FilterLoop:
 	return nil
 }
 
-// GetTenantIDFilter returns tenants filter for the action performed by the tenant
-func (p *ResourceCondition) GetTenantIDFilter(action string, tenantID string) []string {
+func (p *ResourceCondition) GetTenantAndDomainFilters(action string, auth Authorization) (tenantFilter []string, domainFilter []string) {
 	if !p.requireOwner {
-		return nil
+		return
 	}
-	result := []string{}
-	for _, t := range p.actionTenantFilter[action] {
-		result = append(result, t.ID.String())
+
+	if auth.ScopingType() == ScopedToTenant {
+		for _, t := range p.actionTenantFilter[action] {
+			tenantFilter = append(tenantFilter, t.ID.String())
+		}
+		tenantFilter = append(tenantFilter, auth.TenantID())
 	}
-	return append(result, tenantID)
+
+	if auth.DomainID() != "" {
+		domainFilter = []string{auth.DomainID()}
+	}
+	return
 }
 
 // getTenantFilter returns tenants filter for the action performed by the tenant
@@ -700,8 +707,8 @@ func precomputeCondition(
 }
 
 // Adds custom filters based on this policy to the `filters` map
-func (policy *ResourceCondition) AddCustomFilters(filters map[string]interface{}, tenantId string) {
-	addCustomFilters(filters, tenantId, policy.actionFilter)
+func (policy *ResourceCondition) AddCustomFilters(filters map[string]interface{}, auth Authorization) {
+	addCustomFilters(filters, auth, policy.actionFilter)
 }
 
 func (policy *Policy) GetResourcePathRegexp() *regexp.Regexp {
@@ -720,25 +727,32 @@ func (policy *Policy) GetOtherResourceCondition() *ResourceCondition {
 	return policy.otherResourceCondition
 }
 
-func addCustomFilters(f map[string]interface{}, tenantId string, conditionFilters *conditionFilter) {
+func addCustomFilters(f map[string]interface{}, auth Authorization, conditionFilters *conditionFilter) {
 	if conditionFilters == nil {
 		return
 	}
 	filters := make([]map[string]interface{}, 0)
 	if conditionFilters.isOwner {
-		filters = append(filters, map[string]interface{}{"property": "tenant_id", "type": "eq", "value": tenantId})
+		switch auth.ScopingType() {
+		case ScopedToTenant:
+			filters = append(filters, map[string]interface{}{"property": "tenant_id", "type": "eq", "value": auth.TenantID()})
+		case ScopedToDomain:
+			filters = append(filters, map[string]interface{}{"property": "domain_id", "type": "eq", "value": auth.DomainID()})
+		default:
+			panic("Unknown scoping type: " + string(auth.ScopingType()))
+		}
 	}
 	for _, match := range conditionFilters.matches {
 		filters = append(filters, match)
 	}
 	if conditionFilters.andFilters != nil {
 		andFilter := map[string]interface{}{}
-		addCustomFilters(andFilter, tenantId, conditionFilters.andFilters)
+		addCustomFilters(andFilter, auth, conditionFilters.andFilters)
 		filters = append(filters, andFilter)
 	}
 	if conditionFilters.orFilters != nil {
 		orFilter := map[string]interface{}{}
-		addCustomFilters(orFilter, tenantId, conditionFilters.orFilters)
+		addCustomFilters(orFilter, auth, conditionFilters.orFilters)
 		filters = append(filters, orFilter)
 	}
 	if conditionFilters.filterType == orFilter {
