@@ -180,22 +180,6 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		roleIDs = append(roleIDs, r.Name)
 	}
 
-	// Get catalog
-	catalogInput, err := tokenResult.ExtractServiceCatalog()
-	if err != nil {
-		return nil, err
-	}
-	catalog := []*schema.Catalog{}
-	if catalogInput != nil {
-		for _, entry := range catalogInput.Entries {
-			endpoints := []*schema.Endpoint{}
-			for _, e := range entry.Endpoints {
-				endpoints = append(endpoints, schema.NewEndpoint(e.URL, e.Region, e.Interface))
-			}
-			catalog = append(catalog, schema.NewCatalog(entry.Name, entry.Type, endpoints))
-		}
-	}
-
 	// Get project/tenant
 	project, err := tokenResult.ExtractProject()
 	if err != nil {
@@ -210,7 +194,7 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			ID: project.Domain.ID,
 			Name: project.Domain.Name,
 		}
-		return schema.NewScopedToTenantAuthorization(tenant, domain, token, roleIDs, catalog), nil
+		return schema.NewScopedToTenantAuthorization(tenant, domain, roleIDs), nil
 	} else {
 		dom, err := extractDomain(tokenResult)
 		if err != nil {
@@ -223,7 +207,7 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			ID: dom.ID,
 			Name: dom.Name,
 		}
-		return schema.NewScopedToDomainAuthorization(domain, token, roleIDs, catalog), nil
+		return schema.NewScopedToDomainAuthorization(domain, roleIDs), nil
 	}
 }
 
@@ -295,34 +279,7 @@ func (client *keystoneV2Client) VerifyToken(token string) (schema.Authorization,
 	tenant := tenantObj.(map[string]interface{})
 	tenantID := tenant["id"].(string)
 	tenantName := tenant["name"].(string)
-	catalogList := tokenBodyMap["serviceCatalog"].([]interface{})
-	catalogObj := []*schema.Catalog{}
-	for _, rawCatalog := range catalogList {
-		catalog := rawCatalog.(map[string]interface{})
-		endPoints := []*schema.Endpoint{}
-		rawEndpoints := catalog["endpoints"].([]interface{})
-		for _, rawEndpoint := range rawEndpoints {
-			endpoint := rawEndpoint.(map[string]interface{})
-			region := endpoint["region"].(string)
-			adminURL, ok := endpoint["adminURL"].(string)
-			if ok {
-				endPoints = append(endPoints,
-					schema.NewEndpoint(adminURL, region, "admin"))
-			}
-			internalURL, ok := endpoint["internalURL"].(string)
-			if ok {
-				endPoints = append(endPoints,
-					schema.NewEndpoint(internalURL, region, "internal"))
-			}
-			publicURL, ok := endpoint["publicURL"].(string)
-			if ok {
-				endPoints = append(endPoints,
-					schema.NewEndpoint(publicURL, region, "public"))
-			}
-		}
-		catalogObj = append(catalogObj, schema.NewCatalog(catalog["name"].(string), catalog["type"].(string), endPoints))
-	}
-	return schema.NewScopedToTenantAuthorization(schema.Tenant{ID: tenantID, Name: tenantName}, schema.DefaultDomain, token, roleIDs, catalogObj), nil
+	return schema.NewScopedToTenantAuthorization(schema.Tenant{ID: tenantID, Name: tenantName}, schema.DefaultDomain, roleIDs), nil
 }
 
 // GetTenantID maps the given v2.0 project name to the tenant's id

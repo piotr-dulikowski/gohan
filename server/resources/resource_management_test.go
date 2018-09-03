@@ -75,9 +75,9 @@ var _ = Describe("Resource manager", func() {
 			Name: "domainA",
 		}
 
-		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, domainA, adminTokenID, []string{"admin"}, nil)
-		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, domainA, memberTokenID, []string{"Member"}, nil)
-		domainScopedAuth = schema.NewScopedToDomainAuthorization(domainA, powerUserTokenID, []string{"Member"}, nil)
+		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, domainA, []string{"admin"})
+		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, domainA, []string{"Member"})
+		domainScopedAuth = schema.NewScopedToDomainAuthorization(domainA, []string{"Member"})
 		auth = adminAuth
 		context = middleware.Context{
 			"context": ctx,
@@ -99,8 +99,6 @@ var _ = Describe("Resource manager", func() {
 		context["tenant_name"] = auth.TenantName()
 		context["domain_id"] = auth.DomainID()
 		context["domain_name"] = auth.DomainName()
-		context["auth_token"] = auth.AuthToken()
-		context["catalog"] = auth.Catalog()
 		context["auth"] = auth
 	}
 

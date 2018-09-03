@@ -204,7 +204,7 @@ func (*FakeIdentity) VerifyToken(tokenID string) (schema.Authorization, error) {
 		Name: access["token"].(token).Tenant.Name,
 	}
 	role := access["user"].(map[string]interface{})["roles"].([]role)[0].Name
-	return schema.NewScopedToTenantAuthorization(tenant, schema.DefaultDomain, tokenID, []string{role}, nil), nil
+	return schema.NewScopedToTenantAuthorization(tenant, schema.DefaultDomain, []string{role}), nil
 }
 
 // GetTenantID maps the given tenant name to the tenant's ID
