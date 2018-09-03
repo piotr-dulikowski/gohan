@@ -334,7 +334,8 @@ var _ = Describe("Policies", func() {
 		var manager *Manager
 		var testPolicy map[string]interface{}
 		var policy *Policy
-		var authorization BaseAuthorization
+		var authorizationBuilder *AuthorizationBuilder
+		var authorization Authorization
 		var data map[string]interface{}
 
 		BeforeEach(func() {
@@ -348,18 +349,16 @@ var _ = Describe("Policies", func() {
 					"path": ".*",
 				},
 			}
-			authorization = BaseAuthorization{
-				scopingType: ScopedToTenant,
-				tenant: Tenant{
+			authorizationBuilder = NewAuthorizationBuilder().
+				WithTenant(Tenant{
 					ID:   "userID",
 					Name: "userName",
-				},
-				domain: Domain {
-					ID: "domainID",
+				}).
+				WithDomain(Domain{
+					ID:   "domainID",
 					Name: "domainName",
-				},
-				roles:     []*Role{},
-			}
+				})
+			authorization = authorizationBuilder.BuildScopedToTenant()
 		})
 
 		Describe("Actions on own resources", func() {
@@ -375,40 +374,47 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should pass check", func() {
-				err := policy.Check("create", &authorization, data)
+				err := policy.Check("create", authorization, data)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
 			It("should not pass check - not an owner", func() {
-				authorization.tenant.ID = "notOwnerID"
-				authorization.tenant.Name = "notOwnerName"
-				err := policy.Check("create", &authorization, data)
+				authorization = authorizationBuilder.
+					WithTenant(Tenant{
+						ID:   "notOwnerID",
+						Name: "notOwnerName",
+					}).
+					BuildScopedToTenant()
+				err := policy.Check("create", authorization, data)
 				Expect(err).To(MatchError(getTenantProhibitedError("notOwnerName (notOwnerID)", "userName (userID)")))
 			})
 
 			It("should not pass check - different domain", func() {
-				authorization.scopingType = ScopedToDomain
-				authorization.domain.ID = "otherDomainID"
-				authorization.domain.Name = "otherDomainName"
-				err := policy.Check("create", &authorization, data)
+				authorization = authorizationBuilder.
+					WithDomain(Domain{
+						ID:   "otherDomainID",
+						Name: "otherDomainName",
+					}).
+					BuildScopedToDomain()
+				err := policy.Check("create", authorization, data)
 				Expect(err).To(MatchError(getDomainProhibitedError("otherDomainName (otherDomainID)", "domainName (domainID)")))
 			})
 
 			Describe("Effect property", func() {
 				BeforeEach(func() {
 					policy.Action = "*"
-					authorization.roles = []*Role{{"admin"}}
+					authorization = authorizationBuilder.WithRoleIDs("admin").BuildScopedToTenant()
 				})
 				It("should allow access be default", func() {
 					policy.Effect = ""
-					receivedPolicy, role := PolicyValidate("create", "/abc", &authorization, []*Policy{policy})
+					receivedPolicy, role := PolicyValidate("create", "/abc", authorization, []*Policy{policy})
 					Expect(receivedPolicy).To(Equal(policy))
 					Expect(role).To(Equal(&Role{"admin"}))
 				})
 
 				It("should deny access", func() {
 					policy.Effect = "deny"
-					policy, role := PolicyValidate("create", "/abc", &authorization, []*Policy{policy})
+					policy, role := PolicyValidate("create", "/abc", authorization, []*Policy{policy})
 					Expect(policy).To(BeNil())
 					Expect(role).To(BeNil())
 				})
@@ -432,7 +438,7 @@ var _ = Describe("Policies", func() {
 					},
 				}
 				policy, _ = NewPolicy(testPolicy)
-				err := policy.Check("create", &authorization, data)
+				err := policy.Check("create", authorization, data)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
@@ -445,7 +451,7 @@ var _ = Describe("Policies", func() {
 					},
 				}
 				policy, _ = NewPolicy(testPolicy)
-				err := policy.Check("create", &authorization, data)
+				err := policy.Check("create", authorization, data)
 				Expect(err).ToNot(HaveOccurred())
 			})
 		})
