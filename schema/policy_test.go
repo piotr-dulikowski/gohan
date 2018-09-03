@@ -547,6 +547,12 @@ var _ = Describe("Policies", func() {
 		Describe("Custom filter", func() {
 			var testAuth Authorization
 
+			getSchema := func(name string) *Schema {
+				schema, ok := manager.Schema(name)
+				Expect(ok).To(BeTrue())
+				return schema
+			}
+
 			BeforeEach(func() {
 				tenant := Tenant{ID: "test", Name: "test"}
 				testAuth = NewAuthorizationBuilder().
@@ -556,6 +562,7 @@ var _ = Describe("Policies", func() {
 			})
 
 			It("should work with string condition based on conjunction property", func() {
+				schema := getSchema("test")
 				testPolicy["condition"] = []interface{}{
 					map[string]interface{}{
 						"and": []interface{}{
@@ -582,7 +589,7 @@ var _ = Describe("Policies", func() {
 				Expect(err).ToNot(HaveOccurred())
 				filter := map[string]interface{}{}
 				currCond := policy.GetCurrentResourceCondition()
-				currCond.AddCustomFilters(filter, testAuth)
+				currCond.AddCustomFilters(schema, filter, testAuth)
 				expected := map[string]interface{}{
 					"__and__": []map[string]interface{}{
 						{
@@ -600,6 +607,7 @@ var _ = Describe("Policies", func() {
 				Expect(filter).To(Equal(expected))
 			})
 			It("should work with string condition based on disjunction property", func() {
+				schema := getSchema("test")
 				testPolicy["condition"] = []interface{}{
 					map[string]interface{}{
 						"or": []interface{}{
@@ -626,7 +634,7 @@ var _ = Describe("Policies", func() {
 				Expect(err).ToNot(HaveOccurred())
 				filter := map[string]interface{}{}
 				currCond := policy.GetCurrentResourceCondition()
-				currCond.AddCustomFilters(filter, testAuth)
+				currCond.AddCustomFilters(schema, filter, testAuth)
 				expected := map[string]interface{}{
 					"__or__": []map[string]interface{}{
 						{
@@ -644,6 +652,7 @@ var _ = Describe("Policies", func() {
 				Expect(filter).To(Equal(expected))
 			})
 			It("should work with string condition based on is_owner, con/disjunction property", func() {
+				schema := getSchema("test")
 				testPolicy["condition"] = []interface{}{
 					map[string]interface{}{
 						"or": []interface{}{
@@ -682,7 +691,7 @@ var _ = Describe("Policies", func() {
 				Expect(err).ToNot(HaveOccurred())
 				filter := map[string]interface{}{}
 				currCond := policy.GetCurrentResourceCondition()
-				currCond.AddCustomFilters(filter, testAuth)
+				currCond.AddCustomFilters(schema, filter, testAuth)
 				expected := map[string]interface{}{
 					"__or__": []map[string]interface{}{
 						{
@@ -703,11 +712,55 @@ var _ = Describe("Policies", func() {
 									"value":    testAuth.TenantID(),
 								},
 								{
+									"property": "domain_id",
+									"type":     "eq",
+									"value":    testAuth.DomainID(),
+								},
+								{
 									"property": "state",
 									"type":     "eq",
 									"value":    "DOWN",
 								},
 							},
+						},
+					},
+				}
+				Expect(filter).To(Equal(expected))
+			})
+			It("Should, in case of is_owner, filter by domain_id only when the field is defined in the schema", func() {
+				schema := getSchema("network")
+				testPolicy["condition"] = []interface{}{
+					map[string]interface{}{
+						"or": []interface{}{
+							"is_owner",
+							map[string]interface{}{
+								"match": map[string]interface{}{
+									"property": "status",
+									"type":     "eq",
+									"value":    "ACTIVE",
+								},
+							},
+						},
+					},
+				}
+
+				var err error
+				policy, err = NewPolicy(testPolicy)
+				Expect(err).ToNot(HaveOccurred())
+				filter := map[string]interface{}{}
+				currCond := policy.GetCurrentResourceCondition()
+				currCond.AddCustomFilters(schema, filter, testAuth)
+				expected := map[string]interface{}{
+					"__or__": []map[string]interface{} {
+						{
+							"property": "tenant_id",
+							"type":     "eq",
+							"value":    testAuth.TenantID(),
+						},
+						{
+							"property": "status",
+							"type":     "eq",
+							"value":    "ACTIVE",
 						},
 					},
 				}

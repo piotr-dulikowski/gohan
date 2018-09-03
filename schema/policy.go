@@ -153,7 +153,7 @@ type Authorization interface {
 	DomainName() string
 	Roles() []*Role
 	ScopingType() ScopingType
-	getResourceFilter() map[string]interface{}
+	getResourceFilters(schema *Schema) []map[string]interface{}
 	checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error
 	getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string)
 }
@@ -242,12 +242,10 @@ func (auth *TenantScopedAuthorization) ScopingType() ScopingType {
 	return ScopedToTenant
 }
 
-func (auth *TenantScopedAuthorization) getResourceFilter() map[string]interface{} {
-	return map[string]interface{}{
-		"property": "tenant_id",
-		"type": "eq",
-		"value": auth.TenantID(),
-	}
+func (auth *TenantScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
+	tenantFilter := getFilterByPropertyIfPresent(schema, "tenant_id", auth.TenantID())
+	domainFilter := getFilterByPropertyIfPresent(schema, "domain_id", auth.DomainID())
+	return append(tenantFilter, domainFilter...)
 }
 
 func (auth *TenantScopedAuthorization) checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error {
@@ -293,12 +291,8 @@ func (auth *DomainScopedAuthorization) ScopingType() ScopingType {
 	return ScopedToDomain
 }
 
-func (auth *DomainScopedAuthorization) getResourceFilter() map[string]interface{} {
-	return map[string]interface{}{
-		"property": "domain_id",
-		"type": "eq",
-		"value": auth.DomainID(),
-	}
+func (auth *DomainScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
+	return getFilterByPropertyIfPresent(schema, "domain_id", auth.DomainID())
 }
 
 func (auth *DomainScopedAuthorization) checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error {
@@ -308,6 +302,19 @@ func (auth *DomainScopedAuthorization) checkAccessToResource(cond *ResourceCondi
 func (auth *DomainScopedAuthorization) getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string) {
 	domainFilter = []string{auth.DomainID()}
 	return
+}
+
+func getFilterByPropertyIfPresent(schema *Schema, propertyName string, propertyValue interface{}) []map[string]interface{} {
+	if _, err := schema.GetPropertyByID(propertyName); err == nil {
+		return []map[string]interface{} {
+			{
+				"property": propertyName,
+				"type": "eq",
+				"value": propertyValue,
+			},
+		}
+	}
+	return nil
 }
 
 func checkTenantAccess(cond *ResourceCondition, action string, tenant Tenant, resource map[string]interface{}) error {
@@ -773,8 +780,8 @@ func precomputeCondition(
 }
 
 // Adds custom filters based on this policy to the `filters` map
-func (policy *ResourceCondition) AddCustomFilters(filters map[string]interface{}, auth Authorization) {
-	addCustomFilters(filters, auth, policy.actionFilter)
+func (policy *ResourceCondition) AddCustomFilters(schema *Schema, filters map[string]interface{}, auth Authorization) {
+	addCustomFilters(schema, filters, auth, policy.actionFilter)
 }
 
 func (policy *Policy) GetResourcePathRegexp() *regexp.Regexp {
@@ -793,25 +800,25 @@ func (policy *Policy) GetOtherResourceCondition() *ResourceCondition {
 	return policy.otherResourceCondition
 }
 
-func addCustomFilters(f map[string]interface{}, auth Authorization, conditionFilters *conditionFilter) {
+func addCustomFilters(schema *Schema, f map[string]interface{}, auth Authorization, conditionFilters *conditionFilter) {
 	if conditionFilters == nil {
 		return
 	}
 	filters := make([]map[string]interface{}, 0)
 	if conditionFilters.isOwner {
-		filters = append(filters, auth.getResourceFilter())
+		filters = append(filters, auth.getResourceFilters(schema)...)
 	}
 	for _, match := range conditionFilters.matches {
 		filters = append(filters, match)
 	}
 	if conditionFilters.andFilters != nil {
 		andFilter := map[string]interface{}{}
-		addCustomFilters(andFilter, auth, conditionFilters.andFilters)
+		addCustomFilters(schema, andFilter, auth, conditionFilters.andFilters)
 		filters = append(filters, andFilter)
 	}
 	if conditionFilters.orFilters != nil {
 		orFilter := map[string]interface{}{}
-		addCustomFilters(orFilter, auth, conditionFilters.orFilters)
+		addCustomFilters(schema, orFilter, auth, conditionFilters.orFilters)
 		filters = append(filters, orFilter)
 	}
 	if conditionFilters.filterType == orFilter {
