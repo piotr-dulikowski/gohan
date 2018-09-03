@@ -153,6 +153,9 @@ type Authorization interface {
 	DomainName() string
 	Roles() []*Role
 	ScopingType() ScopingType
+	getResourceFilter() map[string]interface{}
+	checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error
+	getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string)
 }
 
 type TenantScopedAuthorization struct {
@@ -239,6 +242,31 @@ func (auth *TenantScopedAuthorization) ScopingType() ScopingType {
 	return ScopedToTenant
 }
 
+func (auth *TenantScopedAuthorization) getResourceFilter() map[string]interface{} {
+	return map[string]interface{}{
+		"property": "tenant_id",
+		"type": "eq",
+		"value": auth.TenantID(),
+	}
+}
+
+func (auth *TenantScopedAuthorization) checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error {
+	if err := checkTenantAccess(cond, action, auth.tenant, resource); err != nil {
+		return err
+	}
+
+	return checkDomainAccess(auth.domain, resource)
+}
+
+func (auth *TenantScopedAuthorization) getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string) {
+	for _, t := range cond.actionTenantFilter[action] {
+		tenantFilter = append(tenantFilter, t.ID.String())
+	}
+	tenantFilter = append(tenantFilter, auth.TenantID())
+	domainFilter = []string{auth.DomainID()}
+	return
+}
+
 // DomainScopedAuthorization
 
 func (auth *DomainScopedAuthorization) TenantID() string {
@@ -263,6 +291,49 @@ func (auth *DomainScopedAuthorization) Roles() []*Role {
 
 func (auth *DomainScopedAuthorization) ScopingType() ScopingType {
 	return ScopedToDomain
+}
+
+func (auth *DomainScopedAuthorization) getResourceFilter() map[string]interface{} {
+	return map[string]interface{}{
+		"property": "domain_id",
+		"type": "eq",
+		"value": auth.DomainID(),
+	}
+}
+
+func (auth *DomainScopedAuthorization) checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error {
+	return checkDomainAccess(auth.domain, resource)
+}
+
+func (auth *DomainScopedAuthorization) getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string) {
+	domainFilter = []string{auth.DomainID()}
+	return
+}
+
+func checkTenantAccess(cond *ResourceCondition, action string, tenant Tenant, resource map[string]interface{}) error {
+	ownerID, _ := resource["tenant_id"].(string)
+	ownerName, _ := resource["tenant_name"].(string)
+	owner := newTenantMatcher(ownerID, ownerName)
+	caller := newTenantMatcher(tenant.ID, tenant.Name)
+
+	if caller.notEqual(owner) && !cond.isTenantAllowed(action, owner, caller) {
+		return fmt.Errorf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
+	}
+
+	return nil
+}
+
+func checkDomainAccess(domain Domain, resource map[string]interface{}) error {
+	resourceDomainID, setsDomain := resource["domain_id"].(string)
+	resourceDomainName, _ := resource["domain_name"].(string)
+	if setsDomain && domain.ID != resourceDomainID {
+		return fmt.Errorf("User from domain '%s (%s)' is prohibited from operating on resources from domain '%s (%s)'",
+			domain.Name, domain.ID,
+			resourceDomainName, resourceDomainID,
+		)
+	}
+
+	return nil
 }
 
 type Tenant struct {
@@ -554,24 +625,8 @@ func (p *Policy) FilterSchema(
 func (p *Policy) Check(action string, authorization Authorization, data map[string]interface{}) error {
 	currCond := p.GetCurrentResourceCondition()
 	if currCond.RequireOwner() {
-		if authorization.ScopingType() == ScopedToTenant {
-			ownerID, _ := data["tenant_id"].(string)
-			ownerName, _ := data["tenant_name"].(string)
-			owner := newTenantMatcher(ownerID, ownerName)
-			caller := newTenantMatcher(authorization.TenantID(), authorization.TenantName())
-
-			if caller.notEqual(owner) && !currCond.isTenantAllowed(action, owner, caller) {
-				return fmt.Errorf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
-			}
-		}
-
-		resourceDomainID, setsDomain := data["domain_id"].(string)
-		resourceDomainName, _ := data["domain_name"].(string)
-		if setsDomain && authorization.DomainID() != resourceDomainID {
-			return fmt.Errorf("User from domain '%s (%s)' is prohibited from operating on resources from domain '%s (%s)'",
-				authorization.DomainName(), authorization.DomainID(),
-				resourceDomainName, resourceDomainID,
-			)
+		if err := authorization.checkAccessToResource(currCond, action, data); err != nil {
+			return err
 		}
 	}
 
@@ -646,18 +701,9 @@ FilterLoop:
 
 func (p *ResourceCondition) GetTenantAndDomainFilters(action string, auth Authorization) (tenantFilter []string, domainFilter []string) {
 	if !p.requireOwner {
-		return
+		return nil, nil
 	}
-
-	if auth.ScopingType() == ScopedToTenant {
-		for _, t := range p.actionTenantFilter[action] {
-			tenantFilter = append(tenantFilter, t.ID.String())
-		}
-		tenantFilter = append(tenantFilter, auth.TenantID())
-	}
-
-	domainFilter = []string{auth.DomainID()}
-	return
+	return auth.getTenantAndDomainFilters(p, action)
 }
 
 // getTenantFilter returns tenants filter for the action performed by the tenantMatcher
@@ -753,14 +799,7 @@ func addCustomFilters(f map[string]interface{}, auth Authorization, conditionFil
 	}
 	filters := make([]map[string]interface{}, 0)
 	if conditionFilters.isOwner {
-		switch auth.ScopingType() {
-		case ScopedToTenant:
-			filters = append(filters, map[string]interface{}{"property": "tenant_id", "type": "eq", "value": auth.TenantID()})
-		case ScopedToDomain:
-			filters = append(filters, map[string]interface{}{"property": "domain_id", "type": "eq", "value": auth.DomainID()})
-		default:
-			panic("Unknown scoping type: " + string(auth.ScopingType()))
-		}
+		filters = append(filters, auth.getResourceFilter())
 	}
 	for _, match := range conditionFilters.matches {
 		filters = append(filters, match)
