@@ -151,9 +151,7 @@ type Authorization interface {
 	TenantName() string
 	DomainID() string
 	DomainName() string
-	AuthToken() string
 	Roles() []*Role
-	Catalog() []*Catalog
 	ScopingType() ScopingType
 }
 
@@ -162,13 +160,11 @@ type BaseAuthorization struct {
 	scopingType ScopingType
 	tenant      Tenant
 	domain      Domain
-	authToken   string
 	roles       []*Role
-	catalog     []*Catalog
 }
 
 //NewScopedToTenantAuthorization is a constructor for auth info scoped to tenant
-func NewScopedToTenantAuthorization(tenant Tenant, domain Domain, authToken string, roleIDs []string, catalog []*Catalog) Authorization {
+func NewScopedToTenantAuthorization(tenant Tenant, domain Domain, roleIDs []string) Authorization {
 	roles := []*Role{}
 	for _, roleID := range roleIDs {
 		roles = append(roles, &Role{Name: roleID})
@@ -178,13 +174,11 @@ func NewScopedToTenantAuthorization(tenant Tenant, domain Domain, authToken stri
 		tenant:      tenant,
 		domain:      domain,
 		roles:       roles,
-		authToken:   authToken,
-		catalog:     catalog,
 	}
 }
 
 //NewScopedToDomainAuthorization constructs auth info when user is scoped to domain
-func NewScopedToDomainAuthorization(domain Domain, authToken string, roleIDs []string, catalog []*Catalog) Authorization {
+func NewScopedToDomainAuthorization(domain Domain, roleIDs []string) Authorization {
 	roles := []*Role{}
 	for _, roleID := range roleIDs {
 		roles = append(roles, &Role{Name: roleID})
@@ -193,8 +187,6 @@ func NewScopedToDomainAuthorization(domain Domain, authToken string, roleIDs []s
 		scopingType: ScopedToDomain,
 		domain:      domain,
 		roles:       roles,
-		authToken:   authToken,
-		catalog:     catalog,
 	}
 }
 
@@ -221,16 +213,6 @@ func (auth *BaseAuthorization) DomainName() string {
 	return auth.domain.Name
 }
 
-//AuthToken returns X_AUTH_TOKEN
-func (auth *BaseAuthorization) AuthToken() string {
-	return auth.authToken
-}
-
-//Catalog returns service catalog
-func (auth *BaseAuthorization) Catalog() []*Catalog {
-	return auth.catalog
-}
-
 func (auth *BaseAuthorization) ScopingType() ScopingType {
 	return auth.scopingType
 }
@@ -253,30 +235,6 @@ var DefaultDomain = Domain{
 //Role describes user role
 type Role struct {
 	Name string
-}
-
-//Endpoint represents Endpoint information
-type Endpoint struct {
-	URL       string
-	Region    string
-	Interface string
-}
-
-//NewEndpoint initializes Endpoint
-func NewEndpoint(url, region, iface string) *Endpoint {
-	return &Endpoint{URL: url, Region: region, Interface: iface}
-}
-
-//Catalog represents service catalog info
-type Catalog struct {
-	Name      string
-	Type      string
-	Endpoints []*Endpoint
-}
-
-//NewCatalog initializes Catalog
-func NewCatalog(name, catalogType string, endPoints []*Endpoint) *Catalog {
-	return &Catalog{Name: name, Type: catalogType, Endpoints: endPoints}
 }
 
 //Match checks if this role is for this principal

@@ -645,7 +645,7 @@ var _ = Describe("Otto extension manager", func() {
 		)
 
 		BeforeEach(func() {
-			adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.DefaultDomain, adminTokenID, []string{"admin"}, nil)
+			adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.DefaultDomain, []string{"admin"})
 			auth = adminAuth
 
 			context = makeContext()
@@ -692,8 +692,6 @@ var _ = Describe("Otto extension manager", func() {
 			context["role"] = role
 			context["tenant_id"] = auth.TenantID()
 			context["tenant_name"] = auth.TenantName()
-			context["auth_token"] = auth.AuthToken()
-			context["catalog"] = auth.Catalog()
 			context["auth"] = auth
 			context["identity_service"] = &middleware.FakeIdentity{}
 
@@ -1529,8 +1527,6 @@ var _ = Describe("Otto extension manager", func() {
 					createSubnetContext["role"] = curRole
 					createSubnetContext["tenant_id"] = auth.TenantID()
 					createSubnetContext["tenant_name"] = auth.TenantName()
-					createSubnetContext["auth_token"] = auth.AuthToken()
-					createSubnetContext["catalog"] = auth.Catalog()
 					createSubnetContext["auth"] = auth
 					createSubnetContext["identity_service"] = &middleware.FakeIdentity{}
 
@@ -1541,8 +1537,6 @@ var _ = Describe("Otto extension manager", func() {
 					readSubnetContext["role"] = curRole
 					readSubnetContext["tenant_id"] = auth.TenantID()
 					readSubnetContext["tenant_name"] = auth.TenantName()
-					readSubnetContext["auth_token"] = auth.AuthToken()
-					readSubnetContext["catalog"] = auth.Catalog()
 					readSubnetContext["auth"] = auth
 					readSubnetContext["identity_service"] = &middleware.FakeIdentity{}
 
@@ -1573,8 +1567,6 @@ var _ = Describe("Otto extension manager", func() {
 					createNetworkContext["role"] = curRole
 					createNetworkContext["tenant_id"] = auth.TenantID()
 					createNetworkContext["tenant_name"] = auth.TenantName()
-					createNetworkContext["auth_token"] = auth.AuthToken()
-					createNetworkContext["catalog"] = auth.Catalog()
 					createNetworkContext["auth"] = auth
 					createNetworkContext["identity_service"] = &middleware.FakeIdentity{}
 				})

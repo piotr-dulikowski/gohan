@@ -40,8 +40,8 @@ var _ = Describe("Policies", func() {
 			Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 			Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
-			adminAuth = NewScopedToTenantAuthorization(Tenant{ID: adminTenantID, Name: "admin"}, DefaultDomain, "fake_token", []string{"admin"}, nil)
-			memberAuth = NewScopedToTenantAuthorization(Tenant{ID: demoTenantID, Name: "demo"}, DefaultDomain, "fake_token", []string{"Member"}, nil)
+			adminAuth = NewScopedToTenantAuthorization(Tenant{ID: adminTenantID, Name: "admin"}, DefaultDomain, []string{"admin"})
+			memberAuth = NewScopedToTenantAuthorization(Tenant{ID: demoTenantID, Name: "demo"}, DefaultDomain, []string{"Member"})
 		})
 
 		AfterEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("Policies", func() {
 			}
 
 			tenant := Tenant{ID: "xyz", Name: "xyz"}
-			xyzAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, "token", []string{"Member"}, nil)
+			xyzAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, []string{"Member"})
 		})
 
 		It("should return error on both types of properties", func() {
@@ -349,9 +349,7 @@ var _ = Describe("Policies", func() {
 					ID: "domainID",
 					Name: "domainName",
 				},
-				authToken: "token",
 				roles:     []*Role{},
-				catalog:   []*Catalog{},
 			}
 		})
 
@@ -536,7 +534,7 @@ var _ = Describe("Policies", func() {
 
 			BeforeEach(func() {
 				tenant := Tenant{ID: "test", Name: "test"}
-				testAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, "token", []string{"Member"}, nil)
+				testAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, []string{"Member"})
 			})
 
 			It("should work with string condition based on conjunction property", func() {
