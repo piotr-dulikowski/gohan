@@ -318,7 +318,7 @@ func GetMultipleResources(context middleware.Context, dataStore db.DB, resourceS
 	filter := FilterFromQueryParameter(resourceSchema, queryParameters)
 	extendFilterByTenantAndDomain(resourceSchema, filter, schema.ActionRead, currCond, auth)
 	filter = policy.RemoveHiddenProperty(filter)
-	currCond.AddCustomFilters(filter, auth)
+	currCond.AddCustomFilters(resourceSchema, filter, auth)
 
 	paginator, err := pagination.FromURLQuery(resourceSchema, queryParameters)
 	if err != nil {
@@ -465,7 +465,7 @@ func GetSingleResourceInTransaction(context middleware.Context, resourceSchema *
 	auth := context["auth"].(schema.Authorization)
 	policy := context["policy"].(*schema.Policy)
 	currCond := policy.GetCurrentResourceCondition()
-	currCond.AddCustomFilters(filter, auth)
+	currCond.AddCustomFilters(resourceSchema, filter, auth)
 
 	object, err := mainTransaction.Fetch(mustGetContext(context), resourceSchema, filter, options)
 	if object == nil {
@@ -559,7 +559,7 @@ func checkIfResourceExistsForTenant(
 
 	currCond := policy.GetCurrentResourceCondition()
 	extendFilterByTenantAndDomain(resourceSchema, filter, schema.ActionUpdate, currCond, auth)
-	currCond.AddCustomFilters(filter, auth)
+	currCond.AddCustomFilters(resourceSchema, filter, auth)
 
 	return checkIfResourceExists(context, filter, resourceSchema, preTransaction)
 }
@@ -988,7 +988,7 @@ func fetchResourceForAction(action string, auth schema.Authorization, resourceID
 	currCond := policy.GetCurrentResourceCondition()
 	filter := transaction.IDFilter(resourceID)
 	extendFilterByTenantAndDomain(resourceSchema, filter, action, currCond, auth)
-	currCond.AddCustomFilters(filter, auth)
+	currCond.AddCustomFilters(resourceSchema, filter, auth)
 	resource, err := tx.Fetch(mustGetContext(context), resourceSchema, filter, nil)
 	if err != nil {
 		return nil, err
@@ -1159,7 +1159,7 @@ func validateAttachmentRelation(
 	otherCond := policy.GetOtherResourceCondition()
 	filter := transaction.IDFilter(relatedResourceID)
 	extendFilterByTenantAndDomain(relatedSchema, filter, schema.ActionRead, otherCond, auth)
-	otherCond.AddCustomFilters(filter, auth)
+	otherCond.AddCustomFilters(relatedSchema, filter, auth)
 
 	options := &transaction.ViewOptions{}
 
