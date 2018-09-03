@@ -75,9 +75,21 @@ var _ = Describe("Resource manager", func() {
 			Name: "domainA",
 		}
 
-		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, domainA, []string{"admin"})
-		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: memberTenantID, Name: "demo"}, domainA, []string{"Member"})
-		domainScopedAuth = schema.NewScopedToDomainAuthorization(domainA, []string{"Member"})
+		adminAuth = schema.NewAuthorizationBuilder().
+			WithTenant(schema.Tenant{ID: adminTenantID, Name: "admin"}).
+			WithDomain(domainA).
+			WithRoleIDs("admin").
+			BuildScopedToTenant()
+		memberAuth = schema.NewAuthorizationBuilder().
+			WithTenant(schema.Tenant{ID: memberTenantID, Name: "demo"}).
+			WithDomain(domainA).
+			WithRoleIDs("Member").
+			BuildScopedToTenant()
+		domainScopedAuth = schema.NewAuthorizationBuilder().
+			WithDomain(domainA).
+			WithRoleIDs("Member").
+			BuildScopedToDomain()
+
 		auth = adminAuth
 		context = middleware.Context{
 			"context": ctx,

@@ -194,7 +194,12 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			ID: project.Domain.ID,
 			Name: project.Domain.Name,
 		}
-		return schema.NewScopedToTenantAuthorization(tenant, domain, roleIDs), nil
+		auth := schema.NewAuthorizationBuilder().
+			WithTenant(tenant).
+			WithDomain(domain).
+			WithRoleIDs(roleIDs...).
+			BuildScopedToTenant()
+		return auth, nil
 	} else {
 		dom, err := extractDomain(tokenResult)
 		if err != nil {
@@ -207,7 +212,11 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			ID: dom.ID,
 			Name: dom.Name,
 		}
-		return schema.NewScopedToDomainAuthorization(domain, roleIDs), nil
+		auth := schema.NewAuthorizationBuilder().
+			WithDomain(domain).
+			WithRoleIDs(roleIDs...).
+			BuildScopedToDomain()
+		return auth, nil
 	}
 }
 
@@ -279,7 +288,11 @@ func (client *keystoneV2Client) VerifyToken(token string) (schema.Authorization,
 	tenant := tenantObj.(map[string]interface{})
 	tenantID := tenant["id"].(string)
 	tenantName := tenant["name"].(string)
-	return schema.NewScopedToTenantAuthorization(schema.Tenant{ID: tenantID, Name: tenantName}, schema.DefaultDomain, roleIDs), nil
+	auth := schema.NewAuthorizationBuilder().
+		WithTenant(schema.Tenant{ID: tenantID, Name: tenantName}).
+		WithRoleIDs(roleIDs...).
+		BuildScopedToTenant()
+	return auth, nil
 }
 
 // GetTenantID maps the given v2.0 project name to the tenant's id

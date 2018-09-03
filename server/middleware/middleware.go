@@ -218,12 +218,20 @@ func (i *NoIdentityService) GetTenantName(string) (string, error) {
 
 //VerifyToken returns always authorization for admin
 func (i *NoIdentityService) VerifyToken(string) (schema.Authorization, error) {
-	return schema.NewScopedToTenantAuthorization(adminTenant, schema.DefaultDomain, []string{"admin"}), nil
+	auth := schema.NewAuthorizationBuilder().
+		WithTenant(adminTenant).
+		WithRoleIDs("admin").
+		BuildScopedToTenant()
+	return auth, nil
 }
 
 //GetServiceAuthorization returns always authorization for admin
 func (i *NoIdentityService) GetServiceAuthorization() (schema.Authorization, error) {
-	return schema.NewScopedToTenantAuthorization(adminTenant, schema.DefaultDomain, []string{"admin"}), nil
+	auth := schema.NewAuthorizationBuilder().
+		WithTenant(adminTenant).
+		WithRoleIDs("admin").
+		BuildScopedToTenant()
+	return auth, nil
 }
 
 //GetClient returns always nil
@@ -247,12 +255,20 @@ func (i *NobodyIdentityService) GetTenantName(string) (string, error) {
 
 //VerifyToken returns always authorization for nobody
 func (i *NobodyIdentityService) VerifyToken(string) (schema.Authorization, error) {
-	return schema.NewScopedToTenantAuthorization(nobodyTenant, schema.DefaultDomain, []string{"Nobody"}), nil
+	auth := schema.NewAuthorizationBuilder().
+		WithTenant(nobodyTenant).
+		WithRoleIDs("Nobody").
+		BuildScopedToTenant()
+	return auth, nil
 }
 
 //GetServiceAuthorization returns always authorization for nobody
 func (i *NobodyIdentityService) GetServiceAuthorization() (schema.Authorization, error) {
-	return schema.NewScopedToTenantAuthorization(nobodyTenant, schema.DefaultDomain, []string{"Nobody"}), nil
+	auth := schema.NewAuthorizationBuilder().
+		WithTenant(nobodyTenant).
+		WithRoleIDs("Nobody").
+		BuildScopedToTenant()
+	return auth, nil
 }
 
 //GetClient returns always nil

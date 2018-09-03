@@ -40,8 +40,14 @@ var _ = Describe("Policies", func() {
 			Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 			Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
-			adminAuth = NewScopedToTenantAuthorization(Tenant{ID: adminTenantID, Name: "admin"}, DefaultDomain, []string{"admin"})
-			memberAuth = NewScopedToTenantAuthorization(Tenant{ID: demoTenantID, Name: "demo"}, DefaultDomain, []string{"Member"})
+			adminAuth = NewAuthorizationBuilder().
+				WithTenant(Tenant{ID: adminTenantID, Name: "admin"}).
+				WithRoleIDs("admin").
+				BuildScopedToTenant()
+			memberAuth = NewAuthorizationBuilder().
+				WithTenant(Tenant{ID: demoTenantID, Name: "demo"}).
+				WithRoleIDs("Member").
+				BuildScopedToTenant()
 		})
 
 		AfterEach(func() {
@@ -103,7 +109,10 @@ var _ = Describe("Policies", func() {
 			}
 
 			tenant := Tenant{ID: "xyz", Name: "xyz"}
-			xyzAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, []string{"Member"})
+			xyzAuth = NewAuthorizationBuilder().
+				WithTenant(tenant).
+				WithRoleIDs("Member").
+				BuildScopedToTenant()
 		})
 
 		It("should return error on both types of properties", func() {
@@ -534,7 +543,10 @@ var _ = Describe("Policies", func() {
 
 			BeforeEach(func() {
 				tenant := Tenant{ID: "test", Name: "test"}
-				testAuth = NewScopedToTenantAuthorization(tenant, DefaultDomain, []string{"Member"})
+				testAuth = NewAuthorizationBuilder().
+					WithTenant(tenant).
+					WithRoleIDs("Member").
+					BuildScopedToTenant()
 			})
 
 			It("should work with string condition based on conjunction property", func() {

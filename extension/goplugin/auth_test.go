@@ -46,10 +46,18 @@ var _ = Describe("Auth", func() {
 		Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 		Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
-
-		adminAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "admin"}, schema.DefaultDomain, []string{"admin"})
-		adminOnDemoAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: adminTenantID, Name: "demo"}, schema.DefaultDomain, []string{"admin"})
-		memberAuth = schema.NewScopedToTenantAuthorization(schema.Tenant{ID: demoTenantID, Name: "demo"}, schema.DefaultDomain, []string{"Member"})
+		adminAuth = schema.NewAuthorizationBuilder().
+			WithTenant(schema.Tenant{ID: adminTenantID, Name: "admin"}).
+			WithRoleIDs("admin").
+			BuildScopedToTenant()
+		adminOnDemoAuth = schema.NewAuthorizationBuilder().
+			WithTenant(schema.Tenant{ID: adminTenantID, Name: "demo"}).
+			WithRoleIDs("admin").
+			BuildScopedToTenant()
+		memberAuth = schema.NewAuthorizationBuilder().
+			WithTenant(schema.Tenant{ID: demoTenantID, Name: "demo"}).
+			WithRoleIDs("Member").
+			BuildScopedToTenant()
 
 		env = goplugin.NewEnvironment("test", nil, nil)
 	})
