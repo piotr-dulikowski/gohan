@@ -155,12 +155,15 @@ type Authorization interface {
 	ScopingType() ScopingType
 }
 
-//BaseAuthorization is base struct for Authorization
-type BaseAuthorization struct {
-	scopingType ScopingType
-	tenant      Tenant
-	domain      Domain
-	roles       []*Role
+type TenantScopedAuthorization struct {
+	tenant Tenant
+	domain Domain
+	roles []*Role
+}
+
+type DomainScopedAuthorization struct {
+	domain Domain
+	roles []*Role
 }
 
 type AuthorizationBuilder struct {
@@ -196,8 +199,7 @@ func (ab *AuthorizationBuilder) WithRoleIDs(roleIDs ...string) *AuthorizationBui
 }
 
 func (ab *AuthorizationBuilder) BuildScopedToTenant() Authorization {
-	return &BaseAuthorization{
-		scopingType: ScopedToTenant,
+	return &TenantScopedAuthorization{
 		tenant:      ab.tenant,
 		domain:      ab.domain,
 		roles:       ab.roles,
@@ -205,39 +207,62 @@ func (ab *AuthorizationBuilder) BuildScopedToTenant() Authorization {
 }
 
 func (ab *AuthorizationBuilder) BuildScopedToDomain() Authorization {
-	return &BaseAuthorization{
-		scopingType: ScopedToDomain,
-		tenant:      ab.tenant,
+	return &DomainScopedAuthorization{
 		domain:      ab.domain,
 		roles:       ab.roles,
 	}
 }
 
-//Roles returns authorized roles
-func (auth *BaseAuthorization) Roles() []*Role {
-	return auth.roles
-}
+// TenantScopedAuthorization
 
-//TenantID returns authorized tenant
-func (auth *BaseAuthorization) TenantID() string {
+func (auth *TenantScopedAuthorization) TenantID() string {
 	return auth.tenant.ID
 }
 
-//TenantName returns authorized tenant name
-func (auth *BaseAuthorization) TenantName() string {
+func (auth *TenantScopedAuthorization) TenantName() string {
 	return auth.tenant.Name
 }
 
-func (auth *BaseAuthorization) DomainID() string {
+func (auth *TenantScopedAuthorization) DomainID() string {
 	return auth.domain.ID
 }
 
-func (auth *BaseAuthorization) DomainName() string {
+func (auth *TenantScopedAuthorization) DomainName() string {
 	return auth.domain.Name
 }
 
-func (auth *BaseAuthorization) ScopingType() ScopingType {
-	return auth.scopingType
+func (auth *TenantScopedAuthorization) Roles() []*Role {
+	return auth.roles
+}
+
+func (auth *TenantScopedAuthorization) ScopingType() ScopingType {
+	return ScopedToTenant
+}
+
+// DomainScopedAuthorization
+
+func (auth *DomainScopedAuthorization) TenantID() string {
+	return ""
+}
+
+func (auth *DomainScopedAuthorization) TenantName() string {
+	return ""
+}
+
+func (auth *DomainScopedAuthorization) DomainID() string {
+	return auth.domain.ID
+}
+
+func (auth *DomainScopedAuthorization) DomainName() string {
+	return auth.domain.Name
+}
+
+func (auth *DomainScopedAuthorization) Roles() []*Role {
+	return auth.roles
+}
+
+func (auth *DomainScopedAuthorization) ScopingType() ScopingType {
+	return ScopedToDomain
 }
 
 type Tenant struct {
