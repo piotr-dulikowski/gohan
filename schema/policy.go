@@ -163,30 +163,53 @@ type BaseAuthorization struct {
 	roles       []*Role
 }
 
-//NewScopedToTenantAuthorization is a constructor for auth info scoped to tenant
-func NewScopedToTenantAuthorization(tenant Tenant, domain Domain, roleIDs []string) Authorization {
-	roles := []*Role{}
-	for _, roleID := range roleIDs {
-		roles = append(roles, &Role{Name: roleID})
-	}
-	return &BaseAuthorization{
-		scopingType: ScopedToTenant,
-		tenant:      tenant,
-		domain:      domain,
-		roles:       roles,
+type AuthorizationBuilder struct {
+	tenant Tenant
+	domain Domain
+	roles  []*Role
+}
+
+func NewAuthorizationBuilder() *AuthorizationBuilder {
+	return &AuthorizationBuilder{
+		domain: DefaultDomain,
+		roles:  []*Role{},
 	}
 }
 
-//NewScopedToDomainAuthorization constructs auth info when user is scoped to domain
-func NewScopedToDomainAuthorization(domain Domain, roleIDs []string) Authorization {
+func (ab *AuthorizationBuilder) WithTenant(tenant Tenant) *AuthorizationBuilder {
+	ab.tenant = tenant
+	return ab
+}
+
+func (ab *AuthorizationBuilder) WithDomain(domain Domain) *AuthorizationBuilder {
+	ab.domain = domain
+	return ab
+}
+
+func (ab *AuthorizationBuilder) WithRoleIDs(roleIDs ...string) *AuthorizationBuilder {
 	roles := []*Role{}
-	for _, roleID := range roleIDs {
-		roles = append(roles, &Role{Name: roleID})
+	for _, id := range roleIDs {
+		roles = append(roles, &Role{Name: id})
 	}
+	ab.roles = roles
+	return ab
+}
+
+func (ab *AuthorizationBuilder) BuildScopedToTenant() Authorization {
+	return &BaseAuthorization{
+		scopingType: ScopedToTenant,
+		tenant:      ab.tenant,
+		domain:      ab.domain,
+		roles:       ab.roles,
+	}
+}
+
+func (ab *AuthorizationBuilder) BuildScopedToDomain() Authorization {
 	return &BaseAuthorization{
 		scopingType: ScopedToDomain,
-		domain:      domain,
-		roles:       roles,
+		tenant:      ab.tenant,
+		domain:      ab.domain,
+		roles:       ab.roles,
 	}
 }
 
