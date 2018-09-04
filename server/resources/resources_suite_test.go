@@ -31,16 +31,16 @@ import (
 )
 
 const (
-	configDir         = ".."
-	configFile        = "./server_test_config.yaml"
-	dbType            = "sqlite3"
-	dbFile            = "./test.db"
-	testSyncEndpoint  = "localhost:2379"
-	adminTenantID     = "fc394f2ab2df4114bde39905f800dc57"
-	memberTenantID    = "fc394f2ab2df4114bde39905f800dc57"
-	powerUserTenantID = "acf5662bbff44060b93ac3db3c25a590"
-	domainAID         = "55f54927e53745788df15d98ff6e6e30"
-	domainBID         = "67a16d0fbc91425aa012e0e3ebffb357"
+	configDir           = ".."
+	configFile          = "./server_test_config.yaml"
+	dbType              = "sqlite3"
+	dbFile              = "./test.db"
+	testSyncEndpoint    = "localhost:2379"
+	adminTenantID       = "adminTenantID"
+	memberTenantID      = "memberTenantID"
+	otherDomainTenantID = "otherDomainTenantID"
+	domainAID           = "domainAID"
+	domainBID           = "domainBID"
 )
 
 var (

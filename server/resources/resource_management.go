@@ -602,20 +602,20 @@ func CreateResource(
 
 	_, err = resourceSchema.GetPropertyByID("tenant_id")
 	if _, ok := dataMap["tenant_id"]; err == nil && !ok {
-		dataMap["tenant_id"] = context["tenant_id"]
+		dataMap["tenant_id"] = auth.TenantID()
 	}
 
 	if tenantID, ok := dataMap["tenant_id"]; ok && tenantID != nil {
-		dataMap["tenant_name"] = context["tenant_name"]
+		dataMap["tenant_name"] = auth.TenantName()
 	}
 
 	_, err = resourceSchema.GetPropertyByID("domain_id")
 	if _, ok := dataMap["domain_id"]; err == nil && !ok {
-		dataMap["domain_id"] = context["domain_id"]
+		dataMap["domain_id"] = auth.DomainID()
 	}
 
 	if domainID, ok := dataMap["domain_id"]; ok && domainID != nil {
-		dataMap["domain_name"] = context["domain_name"]
+		dataMap["domain_name"] = auth.DomainName()
 	}
 
 	//Apply policy for api input
@@ -759,10 +759,10 @@ func UpdateResource(
 
 	//fillup default values
 	if tenantID, ok := dataMap["tenant_id"]; ok && tenantID != nil {
-		dataMap["tenant_name"] = context["tenant_name"]
+		dataMap["tenant_name"] = auth.TenantName()
 	}
 	if domainID, ok := dataMap["domain_id"]; ok && domainID != nil {
-		dataMap["domain_name"] = context["domain_name"]
+		dataMap["domain_name"] = auth.DomainName()
 	}
 
 	//check policy
