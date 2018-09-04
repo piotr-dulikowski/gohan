@@ -694,7 +694,6 @@ var _ = Describe("Otto extension manager", func() {
 			context["policy"] = policy
 			context["role"] = role
 			context["tenant_id"] = auth.TenantID()
-			context["tenant_name"] = auth.TenantName()
 			context["auth"] = auth
 			context["identity_service"] = &middleware.FakeIdentity{}
 
@@ -1529,7 +1528,6 @@ var _ = Describe("Otto extension manager", func() {
 					createSubnetContext["policy"] = curPolicy
 					createSubnetContext["role"] = curRole
 					createSubnetContext["tenant_id"] = auth.TenantID()
-					createSubnetContext["tenant_name"] = auth.TenantName()
 					createSubnetContext["auth"] = auth
 					createSubnetContext["identity_service"] = &middleware.FakeIdentity{}
 
@@ -1539,7 +1537,6 @@ var _ = Describe("Otto extension manager", func() {
 					readSubnetContext["policy"] = curPolicy
 					readSubnetContext["role"] = curRole
 					readSubnetContext["tenant_id"] = auth.TenantID()
-					readSubnetContext["tenant_name"] = auth.TenantName()
 					readSubnetContext["auth"] = auth
 					readSubnetContext["identity_service"] = &middleware.FakeIdentity{}
 
@@ -1569,7 +1566,6 @@ var _ = Describe("Otto extension manager", func() {
 					createNetworkContext["policy"] = curPolicy
 					createNetworkContext["role"] = curRole
 					createNetworkContext["tenant_id"] = auth.TenantID()
-					createNetworkContext["tenant_name"] = auth.TenantName()
 					createNetworkContext["auth"] = auth
 					createNetworkContext["identity_service"] = &middleware.FakeIdentity{}
 				})

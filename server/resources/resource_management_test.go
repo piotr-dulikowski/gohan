@@ -39,9 +39,9 @@ import (
 
 var _ = Describe("Resource manager", func() {
 	const (
-		resourceID1 = "6660fbf8-ca60-4cb0-a42e-9a913beafbaf"
-		resourceID2 = "6660fbf8-ca60-4cb0-a42e-9a913beafbae"
-		resourceID3 = "6660fbf8-ca60-4cb0-a42e-9a913beafbad"
+		adminResourceID       = "6660fbf8-ca60-4cb0-a42e-9a913beafbaf"
+		memberResourceID      = "6660fbf8-ca60-4cb0-a42e-9a913beafbae"
+		otherDomainResourceID = "6660fbf8-ca60-4cb0-a42e-9a913beafbad"
 	)
 
 	var (
@@ -107,15 +107,12 @@ var _ = Describe("Resource manager", func() {
 		context["policy"] = policy
 		context["role"] = role
 		context["tenant_id"] = auth.TenantID()
-		context["tenant_name"] = auth.TenantName()
-		context["domain_id"] = auth.DomainID()
-		context["domain_name"] = auth.DomainName()
 		context["auth"] = auth
 	}
 
 	setupTestResources := func() {
 		adminResourceData = map[string]interface{}{
-			"id":           resourceID1,
+			"id":           adminResourceID,
 			"tenant_id":    adminTenantID,
 			"domain_id":    domainAID,
 			"test_string":  "Steloj estas en ordo.",
@@ -124,8 +121,8 @@ var _ = Describe("Resource manager", func() {
 			"test_bool":    false,
 		}
 		memberResourceData = map[string]interface{}{
-			"id":           resourceID2,
-			"tenant_id":    powerUserTenantID,
+			"id":           memberResourceID,
+			"tenant_id":    memberTenantID,
 			"domain_id":    domainAID,
 			"test_string":  "Mi estas la pordo, mi estas la sxlosilo.",
 			"test_number":  0.5,
@@ -133,8 +130,8 @@ var _ = Describe("Resource manager", func() {
 			"test_bool":    false,
 		}
 		otherDomainResourceData = map[string]interface{}{
-			"id":           resourceID3,
-			"tenant_id":    memberTenantID,
+			"id":           otherDomainResourceID,
+			"tenant_id":    otherDomainTenantID,
 			"domain_id":    domainBID,
 			"test_string":  "Mi estas tekruĉo.",
 			"test_number":  0.5,
@@ -480,7 +477,7 @@ var _ = Describe("Resource manager", func() {
 					number := context["total"].(uint64)
 					Expect(err).NotTo(HaveOccurred())
 					Expect(number).To(Equal(uint64(1)))
-					Expect(result).To(HaveKeyWithValue("tests", ConsistOf(adminResourceData)))
+					Expect(result).To(HaveKeyWithValue("tests", ConsistOf(memberResourceData)))
 				})
 			})
 
@@ -512,7 +509,7 @@ var _ = Describe("Resource manager", func() {
 		Describe("When there are no resources in the database", func() {
 			It("Should return an informative error", func() {
 				err := resources.GetSingleResource(
-					context, testDB, currentSchema, resourceID1)
+					context, testDB, currentSchema, adminResourceID)
 				Expect(err).To(HaveOccurred())
 				_, ok := err.(resources.ResourceError)
 				Expect(ok).To(BeTrue())
@@ -526,7 +523,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						result := context["response"].(map[string]interface{})
 						Expect(err).NotTo(HaveOccurred())
 						Expect(result).To(HaveKeyWithValue("respondo", "bona"))
@@ -540,7 +537,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -557,7 +554,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -571,7 +568,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -585,7 +582,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -604,7 +601,7 @@ var _ = Describe("Resource manager", func() {
 			Context("As an admin", func() {
 				It("Should return owned resource", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID1)
+						context, testDB, currentSchema, adminResourceID)
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(adminResourceData)))
@@ -612,7 +609,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should return not owned resource from the same domain", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID2)
+						context, testDB, currentSchema, memberResourceID)
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(memberResourceData)))
@@ -620,7 +617,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should return resource from other domain", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID3)
+						context, testDB, currentSchema, otherDomainResourceID)
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(otherDomainResourceData)))
@@ -634,15 +631,15 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should return owned resource", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID1)
+						context, testDB, currentSchema, memberResourceID)
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
-					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(adminResourceData)))
+					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(memberResourceData)))
 				})
 
-				It("Should not return not owned resource", func() {
+				It("Should not return not owned resource from the same domain", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID2)
+						context, testDB, currentSchema, adminResourceID)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -650,7 +647,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should not return resource from other domain", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID3)
+						context, testDB, currentSchema, otherDomainResourceID)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -670,13 +667,13 @@ var _ = Describe("Resource manager", func() {
 						result := context["response"].(map[string]interface{})
 						Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(*data)))
 					},
-					Entry("Resource 1", resourceID1, &adminResourceData),
-					Entry("Resource 2", resourceID2, &memberResourceData),
+					Entry("Resource 1", adminResourceID, &adminResourceData),
+					Entry("Resource 2", memberResourceID, &memberResourceData),
 				)
 
 				It("Should not return resource from other domain", func() {
 					err := resources.GetSingleResource(
-						context, testDB, currentSchema, resourceID3)
+						context, testDB, currentSchema, otherDomainResourceID)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -691,7 +688,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						result := context["response"].(map[string]interface{})
 						Expect(err).NotTo(HaveOccurred())
 						Expect(result).To(HaveKeyWithValue("respondo", "bona"))
@@ -705,7 +702,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -722,7 +719,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -739,7 +736,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						result := context["response"].(map[string]interface{})
 						Expect(err).NotTo(HaveOccurred())
 						Expect(result).To(HaveKeyWithValue("respondo", "tre bona"))
@@ -753,7 +750,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -770,7 +767,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.GetSingleResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -793,7 +790,7 @@ var _ = Describe("Resource manager", func() {
 		Describe("When there are no resources in the database", func() {
 			It("Should return an informative error", func() {
 				err := resources.DeleteResource(
-					context, testDB, currentSchema, resourceID1)
+					context, testDB, currentSchema, adminResourceID)
 				Expect(err).To(HaveOccurred())
 				_, ok := err.(resources.ResourceError)
 				Expect(ok).To(BeTrue())
@@ -807,7 +804,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -824,7 +821,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -838,7 +835,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -852,7 +849,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -867,17 +864,17 @@ var _ = Describe("Resource manager", func() {
 			Context("As an admin", func() {
 				It("Should delete owned resource", func() {
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID1)).To(Succeed())
+						context, testDB, currentSchema, adminResourceID)).To(Succeed())
 				})
 
 				It("Should delete not owned resource", func() {
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID2)).To(Succeed())
+						context, testDB, currentSchema, memberResourceID)).To(Succeed())
 				})
 
 				It("Should delete resource from other domain", func() {
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID3)).To(Succeed())
+						context, testDB, currentSchema, otherDomainResourceID)).To(Succeed())
 				})
 			})
 
@@ -888,12 +885,12 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should delete owned resource", func() {
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID1)).To(Succeed())
+						context, testDB, currentSchema, memberResourceID)).To(Succeed())
 				})
 
 				It("Should not delete not owned resource", func() {
 					err := resources.DeleteResource(
-						context, testDB, currentSchema, resourceID2)
+						context, testDB, currentSchema, adminResourceID)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -901,7 +898,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should not delete resource from other domain", func() {
 					err := resources.DeleteResource(
-						context, testDB, currentSchema, resourceID3)
+						context, testDB, currentSchema, otherDomainResourceID)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -915,14 +912,14 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should delete resource from the same domain", func() {
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID1)).To(Succeed())
+						context, testDB, currentSchema, adminResourceID)).To(Succeed())
 					Expect(resources.DeleteResource(
-						context, testDB, currentSchema, resourceID2)).To(Succeed())
+						context, testDB, currentSchema, memberResourceID)).To(Succeed())
 				})
 
 				It("Should not delete resource from other domain", func() {
 					err := resources.DeleteResource(
-						context, testDB, currentSchema, resourceID3)
+						context, testDB, currentSchema, otherDomainResourceID)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -937,7 +934,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -954,7 +951,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -971,7 +968,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -988,7 +985,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.DeleteResource(
-							context, testDB, currentSchema, resourceID1)
+							context, testDB, currentSchema, adminResourceID)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -1046,26 +1043,26 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should fill in the tenant_id", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1, "domain_id": domainAID})
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": adminResourceID, "domain_id": domainAID})
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
 					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
-					Expect(theResource).To(HaveKeyWithValue("id", resourceID1))
+					Expect(theResource).To(HaveKeyWithValue("id", adminResourceID))
 				})
 
 				It("Should fill in the domain_id", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1, "tenant_id": adminTenantID})
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": adminResourceID, "tenant_id": adminTenantID})
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
 					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
-					Expect(theResource).To(HaveKeyWithValue("id", resourceID1))
+					Expect(theResource).To(HaveKeyWithValue("id", adminResourceID))
 				})
 
 				It("Should fill in id, tenant_id and domain_id", func() {
@@ -1104,15 +1101,15 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should create own resource", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, adminResourceData)
+						context, testDB, fakeIdentity, currentSchema, memberResourceData)
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
-					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(adminResourceData)))
+					Expect(result).To(HaveKeyWithValue(schemaID, util.MatchAsJSON(memberResourceData)))
 				})
 
 				It("Should not create not own resource", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, memberResourceData)
+						context, testDB, fakeIdentity, currentSchema, adminResourceData)
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
 					Expect(ok).To(BeTrue())
@@ -1154,14 +1151,14 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should fill in the domain_id", func() {
 					err := resources.CreateResource(
-						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": resourceID1, "tenant_id": adminTenantID})
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": adminResourceID, "tenant_id": adminTenantID})
 					result := context["response"].(map[string]interface{})
 					Expect(err).NotTo(HaveOccurred())
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
 					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
-					Expect(theResource).To(HaveKeyWithValue("id", resourceID1))
+					Expect(theResource).To(HaveKeyWithValue("id", adminResourceID))
 				})
 			})
 
@@ -1267,7 +1264,7 @@ var _ = Describe("Resource manager", func() {
 		Describe("When there are no resources in the database", func() {
 			It("Should return an informative error", func() {
 				err := resources.UpdateResource(
-					context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
+					context, testDB, fakeIdentity, currentSchema, adminResourceID, adminResourceData)
 				Expect(err).To(HaveOccurred())
 				_, ok := err.(resources.ResourceError)
 				Expect(ok).To(BeTrue())
@@ -1281,7 +1278,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
+							context, testDB, fakeIdentity, currentSchema, adminResourceID, adminResourceData)
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
 						Expect(ok).To(BeTrue())
@@ -1298,7 +1295,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
+							context, testDB, fakeIdentity, currentSchema, adminResourceID, adminResourceData)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -1312,7 +1309,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
+							context, testDB, fakeIdentity, currentSchema, adminResourceID, adminResourceData)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -1326,7 +1323,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should not run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
+							context, testDB, fakeIdentity, currentSchema, adminResourceID, adminResourceData)
 						Expect(err).To(HaveOccurred())
 						_, ok := err.(resources.ResourceError)
 						Expect(ok).To(BeTrue())
@@ -1352,7 +1349,7 @@ var _ = Describe("Resource manager", func() {
 				delete(adminResourceData, "domain_id")
 
 				err = resources.UpdateResource(
-					context, testDB, fakeIdentity, currentSchema, resourceID1, adminResourceData)
+					context, testDB, fakeIdentity, currentSchema, adminResourceID, adminResourceData)
 				Expect(err).To(Succeed())
 
 			})
@@ -1368,7 +1365,7 @@ var _ = Describe("Resource manager", func() {
 
 				BeforeEach(func() {
 					adminNetworkData = map[string]interface{}{
-						"id":            resourceID2,
+						"id":            memberResourceID,
 						"route_targets": []interface{}{"routeTarget1"},
 					}
 
@@ -1392,9 +1389,9 @@ var _ = Describe("Resource manager", func() {
 						Expect(ok).To(BeTrue())
 						Expect(theResource).To(HaveKeyWithValue("test_string", "Ia, ia, HJPEV fhtang!"))
 					},
-					Entry("Own resource", resourceID1),
-					Entry("Not own resource, same domain", resourceID2),
-					Entry("Resource form other domain", resourceID3),
+					Entry("Own resource", adminResourceID),
+					Entry("Not own resource, same domain", memberResourceID),
+					Entry("Resource form other domain", otherDomainResourceID),
 				)
 
 				It("Should only modify updated fields in subobjects", func() {
@@ -1414,7 +1411,7 @@ var _ = Describe("Resource manager", func() {
 					vlanId := defaultVlan["vlan_id"]
 					Expect(vlanId).To(Equal(1)) // default vlan_id value
 
-					Expect(resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, resourceID2, adminNetworkUpdate)).To(Succeed())
+					Expect(resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, memberResourceID, adminNetworkUpdate)).To(Succeed())
 
 					result = context["response"].(map[string]interface{})
 					network, found = result["network"].(map[string]interface{})
@@ -1440,7 +1437,7 @@ var _ = Describe("Resource manager", func() {
 					routeTargets := network["route_targets"]
 					Expect(routeTargets).To(Equal([]interface{}{"routeTarget1"}))
 
-					Expect(resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, resourceID2, map[string]interface{}{
+					Expect(resources.UpdateResource(context, testDB, fakeIdentity, networkSchema, memberResourceID, map[string]interface{}{
 						"route_targets": []interface{}{"testTarget2", "testTarget3"},
 					})).To(Succeed())
 
@@ -1452,14 +1449,14 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should properly update nil objects", func() {
 					testSchema, _ := manager.Schema("nil_test")
-					Expect(resources.CreateResource(context, testDB, fakeIdentity, testSchema, map[string]interface{}{"id": resourceID2})).To(Succeed())
+					Expect(resources.CreateResource(context, testDB, fakeIdentity, testSchema, map[string]interface{}{"id": memberResourceID})).To(Succeed())
 					result := context["response"].(map[string]interface{})
 					mainObject, found := result["nil_test"].(map[string]interface{})
 					Expect(found).To(BeTrue())
 					subObject := mainObject["nested_obj"]
 					Expect(subObject).To(BeNil())
 
-					Expect(resources.UpdateResource(context, testDB, fakeIdentity, testSchema, resourceID2, map[string]interface{}{
+					Expect(resources.UpdateResource(context, testDB, fakeIdentity, testSchema, memberResourceID, map[string]interface{}{
 						"nested_obj": map[string]interface{}{
 							"nested_string": "nestedString",
 						}})).To(Succeed())
@@ -1480,7 +1477,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should update own resource", func() {
 					err := resources.UpdateResource(
-						context, testDB, fakeIdentity, currentSchema, resourceID1,
+						context, testDB, fakeIdentity, currentSchema, memberResourceID,
 						map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 					Expect(err).NotTo(HaveOccurred())
 					result := context["response"].(map[string]interface{})
@@ -1491,7 +1488,7 @@ var _ = Describe("Resource manager", func() {
 
 				It("Should not update not own resource", func() {
 					err := resources.UpdateResource(
-						context, testDB, fakeIdentity, currentSchema, resourceID2,
+						context, testDB, fakeIdentity, currentSchema, adminResourceID,
 						map[string]interface{}{"test_string": "Ia, ia, HWCBN fhtang!"})
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
@@ -1517,13 +1514,13 @@ var _ = Describe("Resource manager", func() {
 						Expect(ok).To(BeTrue())
 						Expect(theResource).To(HaveKeyWithValue("test_string", "Steloj ne estas en ordo."))
 					},
-					Entry("Resource 1", resourceID1),
-					Entry("Resource 2", resourceID2),
+					Entry("Resource 1", adminResourceID),
+					Entry("Resource 2", memberResourceID),
 				)
 
 				It("Should not update resource from other domain", func() {
 					err := resources.UpdateResource(
-						context, testDB, fakeIdentity, currentSchema, resourceID3,
+						context, testDB, fakeIdentity, currentSchema, otherDomainResourceID,
 						map[string]interface{}{"test_string": "Ia, ia, HWCBN fhtang!"})
 					Expect(err).To(HaveOccurred())
 					_, ok := err.(resources.ResourceError)
@@ -1612,7 +1609,7 @@ var _ = Describe("Resource manager", func() {
 					})
 					JustBeforeEach(func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							requestMap)
 						result := context["response"].(map[string]interface{})
 						Expect(err).NotTo(HaveOccurred())
@@ -1628,7 +1625,7 @@ var _ = Describe("Resource manager", func() {
 						context["request_data"] = deepcopy.Copy(requestMap).(map[string]interface{})
 
 						Expect(resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							requestMap)).To(Succeed())
 						result := context["response"].(map[string]interface{})
 						theResource, ok := result[schemaID]
@@ -1643,7 +1640,7 @@ var _ = Describe("Resource manager", func() {
 						context["request_data"] = deepcopy.Copy(requestMap).(map[string]interface{})
 
 						Expect(resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							requestMap)).To(Succeed())
 						result := context["response"].(map[string]interface{})
 						theResource, ok := result[schemaID]
@@ -1659,7 +1656,7 @@ var _ = Describe("Resource manager", func() {
 						context["request_data"] = deepcopy.Copy(requestMap).(map[string]interface{})
 
 						Expect(resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							requestMap)).To(Succeed())
 						result := context["response"].(map[string]interface{})
 						theResource, ok := result[schemaID]
@@ -1673,7 +1670,7 @@ var _ = Describe("Resource manager", func() {
 						context["request_data"] = deepcopy.Copy(requestMap).(map[string]interface{})
 
 						Expect(resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							requestMap)).To(Succeed())
 						result := context["response"].(map[string]interface{})
 						theResource, ok := result[schemaID]
@@ -1703,10 +1700,10 @@ var _ = Describe("Resource manager", func() {
 					It("should run validation after pre_update", func() {
 						Expect(resources.CreateResource(context, testDB, fakeIdentity, currentSchema, deepcopy.Copy(requestMap).(map[string]interface{}))).To(Succeed())
 
-						err := resources.UpdateResource(context, testDB, fakeIdentity, currentSchema, resourceID1, map[string]interface{}{})
+						err := resources.UpdateResource(context, testDB, fakeIdentity, currentSchema, adminResourceID, map[string]interface{}{})
 						Expect(err).To(MatchError("Json validation error:\n\ttest_string: String length must be less than or equal to 40,"))
 
-						Expect(resources.UpdateResource(context, testDB, fakeIdentity, currentSchema, resourceID1, requestMap)).To(Succeed())
+						Expect(resources.UpdateResource(context, testDB, fakeIdentity, currentSchema, adminResourceID, requestMap)).To(Succeed())
 					})
 				})
 
@@ -1717,7 +1714,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
@@ -1735,7 +1732,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
@@ -1753,7 +1750,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
@@ -1771,7 +1768,7 @@ var _ = Describe("Resource manager", func() {
 
 					It("Should run the extension", func() {
 						err := resources.UpdateResource(
-							context, testDB, fakeIdentity, currentSchema, resourceID1,
+							context, testDB, fakeIdentity, currentSchema, adminResourceID,
 							map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 						Expect(err).To(HaveOccurred())
 						extErr, ok := err.(extension.Error)
@@ -1821,7 +1818,7 @@ var _ = Describe("Resource manager", func() {
 
 			It("Should run the extension", func() {
 				err := resources.ActionResource(
-					context, currentSchema, fakeAction, resourceID1,
+					context, currentSchema, fakeAction, adminResourceID,
 					map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 				Expect(err).To(HaveOccurred())
 				extErr, ok := err.(extension.Error)
@@ -1834,7 +1831,7 @@ var _ = Describe("Resource manager", func() {
 			Context("Without input shcema", func() {
 				It("Should run the extension", func() {
 					err := resources.ActionResource(
-						context, currentSchema, fakeActionWithoutInput, resourceID1,
+						context, currentSchema, fakeActionWithoutInput, adminResourceID,
 						map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 					Expect(err).To(HaveOccurred())
 					extErr, ok := err.(extension.Error)
@@ -1904,7 +1901,7 @@ var _ = Describe("Resource manager", func() {
 
 			By("Updating the resource")
 			err = resources.UpdateResource(
-				updateContext, testDB, fakeIdentity, currentSchema, resourceID1,
+				updateContext, testDB, fakeIdentity, currentSchema, adminResourceID,
 				map[string]interface{}{"test_string": "Steloj ne estas en ordo."})
 			result = updateContext["response"].(map[string]interface{})
 			Expect(err).NotTo(HaveOccurred())
@@ -1912,16 +1909,16 @@ var _ = Describe("Resource manager", func() {
 
 			By("Showing the updated resource")
 			err = resources.GetSingleResource(
-				showContext, testDB, currentSchema, resourceID1)
+				showContext, testDB, currentSchema, adminResourceID)
 			result = showContext["response"].(map[string]interface{})
 			By(fmt.Sprintf("%s", result))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(HaveKeyWithValue(schemaID, HaveKeyWithValue("test_string", "Steloj ne estas en ordo.")))
 
 			By("Deleting the resource")
-			By(resourceID1)
+			By(adminResourceID)
 			Expect(resources.DeleteResource(
-				deleteContext, testDB, currentSchema, resourceID1)).To(Succeed())
+				deleteContext, testDB, currentSchema, adminResourceID)).To(Succeed())
 
 			By("Again showing nothing in an empty database")
 			delete(listContext, "response")
