@@ -106,7 +106,6 @@ var _ = Describe("Resource manager", func() {
 		Expect(policy).ToNot(BeNil())
 		context["policy"] = policy
 		context["role"] = role
-		context["token_scoping_type"] = string(auth.ScopingType())
 		context["tenant_id"] = auth.TenantID()
 		context["tenant_name"] = auth.TenantName()
 		context["domain_id"] = auth.DomainID()
