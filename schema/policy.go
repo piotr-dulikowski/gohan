@@ -137,14 +137,6 @@ type resourceFilter struct {
 	Path             *regexp.Regexp
 }
 
-//ScopingType describes how the authorization is scoped
-type ScopingType string
-
-const (
-	ScopedToTenant ScopingType = "tenant"
-	ScopedToDomain ScopingType = "domain"
-)
-
 //Authorization interface
 type Authorization interface {
 	TenantID() string
@@ -152,7 +144,6 @@ type Authorization interface {
 	DomainID() string
 	DomainName() string
 	Roles() []*Role
-	ScopingType() ScopingType
 	getResourceFilters(schema *Schema) []map[string]interface{}
 	checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error
 	getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string)
@@ -238,10 +229,6 @@ func (auth *TenantScopedAuthorization) Roles() []*Role {
 	return auth.roles
 }
 
-func (auth *TenantScopedAuthorization) ScopingType() ScopingType {
-	return ScopedToTenant
-}
-
 func (auth *TenantScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
 	tenantFilter := getFilterByPropertyIfPresent(schema, "tenant_id", auth.TenantID())
 	domainFilter := getFilterByPropertyIfPresent(schema, "domain_id", auth.DomainID())
@@ -285,10 +272,6 @@ func (auth *DomainScopedAuthorization) DomainName() string {
 
 func (auth *DomainScopedAuthorization) Roles() []*Role {
 	return auth.roles
-}
-
-func (auth *DomainScopedAuthorization) ScopingType() ScopingType {
-	return ScopedToDomain
 }
 
 func (auth *DomainScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
