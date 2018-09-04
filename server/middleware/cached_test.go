@@ -29,8 +29,8 @@ var _ = ginkgo.Describe("Cached identity service", func() {
 		mockedIdentityService = NewMockIdentityService(ctrl)
 		cachedIdentityService = NewCachedIdentityService(mockedIdentityService, time.Second)
 		serviceClient = &gophercloud.ServiceClient{ProviderClient: &gophercloud.ProviderClient{TokenID: token}}
-		tenant := schema.Tenant {
-			ID: "tenant-id",
+		tenant := schema.Tenant{
+			ID:   "tenant-id",
 			Name: "tenant-name",
 		}
 		token = "token"

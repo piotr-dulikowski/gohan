@@ -199,8 +199,8 @@ func (*FakeIdentity) VerifyToken(tokenID string) (schema.Authorization, error) {
 	}
 
 	access, _ := rawToken.(map[string]interface{})["access"].(map[string]interface{})
-	tenant := schema.Tenant {
-		ID: access["token"].(token).Tenant.ID,
+	tenant := schema.Tenant{
+		ID:   access["token"].(token).Tenant.ID,
 		Name: access["token"].(token).Tenant.Name,
 	}
 	role := access["user"].(map[string]interface{})["roles"].([]role)[0].Name

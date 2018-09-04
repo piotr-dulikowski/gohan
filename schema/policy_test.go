@@ -751,7 +751,7 @@ var _ = Describe("Policies", func() {
 				currCond := policy.GetCurrentResourceCondition()
 				currCond.AddCustomFilters(schema, filter, testAuth)
 				expected := map[string]interface{}{
-					"__or__": []map[string]interface{} {
+					"__or__": []map[string]interface{}{
 						{
 							"property": "tenant_id",
 							"type":     "eq",
