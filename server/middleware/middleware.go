@@ -38,16 +38,15 @@ import (
 const webuiPATH = "/webui/"
 
 var (
-	adminTenant = schema.Tenant {
-		ID: "admin",
+	adminTenant = schema.Tenant{
+		ID:   "admin",
 		Name: "admin",
 	}
-	nobodyTenant = schema.Tenant {
-		ID: "nobody",
+	nobodyTenant = schema.Tenant{
+		ID:   "nobody",
 		Name: "nobody",
 	}
 )
-
 
 type responseHijacker struct {
 	martini.ResponseWriter

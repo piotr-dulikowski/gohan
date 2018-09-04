@@ -26,8 +26,8 @@ import (
 	v3tokens "github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/pagination"
 
-	"github.com/cloudwan/gohan/schema"
 	"errors"
+	"github.com/cloudwan/gohan/schema"
 )
 
 //KeystoneIdentity middleware
@@ -186,12 +186,12 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		return nil, err
 	}
 	if project != nil {
-		tenant := schema.Tenant {
-			ID: project.ID,
+		tenant := schema.Tenant{
+			ID:   project.ID,
 			Name: project.Name,
 		}
-		domain := schema.Domain {
-			ID: project.Domain.ID,
+		domain := schema.Domain{
+			ID:   project.Domain.ID,
 			Name: project.Domain.Name,
 		}
 		auth := schema.NewAuthorizationBuilder().
@@ -208,8 +208,8 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		if dom == nil {
 			return nil, errors.New("Token is unscoped")
 		}
-		domain := schema.Domain {
-			ID: dom.ID,
+		domain := schema.Domain{
+			ID:   dom.ID,
 			Name: dom.Name,
 		}
 		auth := schema.NewAuthorizationBuilder().
