@@ -20,6 +20,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloudwan/gohan/extension/goext/filter"
 	"github.com/cloudwan/gohan/util"
 	"github.com/pkg/errors"
 )
@@ -150,14 +151,13 @@ type Authorization interface {
 }
 
 type TenantScopedAuthorization struct {
+	DomainScopedAuthorization
 	tenant Tenant
-	domain Domain
-	roles []*Role
 }
 
 type DomainScopedAuthorization struct {
 	domain Domain
-	roles []*Role
+	roles  []*Role
 }
 
 type AuthorizationBuilder struct {
@@ -194,16 +194,18 @@ func (ab *AuthorizationBuilder) WithRoleIDs(roleIDs ...string) *AuthorizationBui
 
 func (ab *AuthorizationBuilder) BuildScopedToTenant() Authorization {
 	return &TenantScopedAuthorization{
-		tenant:      ab.tenant,
-		domain:      ab.domain,
-		roles:       ab.roles,
+		tenant: ab.tenant,
+		DomainScopedAuthorization: DomainScopedAuthorization{
+			domain: ab.domain,
+			roles:  ab.roles,
+		},
 	}
 }
 
 func (ab *AuthorizationBuilder) BuildScopedToDomain() Authorization {
 	return &DomainScopedAuthorization{
-		domain:      ab.domain,
-		roles:       ab.roles,
+		domain: ab.domain,
+		roles:  ab.roles,
 	}
 }
 
@@ -215,18 +217,6 @@ func (auth *TenantScopedAuthorization) TenantID() string {
 
 func (auth *TenantScopedAuthorization) TenantName() string {
 	return auth.tenant.Name
-}
-
-func (auth *TenantScopedAuthorization) DomainID() string {
-	return auth.domain.ID
-}
-
-func (auth *TenantScopedAuthorization) DomainName() string {
-	return auth.domain.Name
-}
-
-func (auth *TenantScopedAuthorization) Roles() []*Role {
-	return auth.roles
 }
 
 func (auth *TenantScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
@@ -289,12 +279,8 @@ func (auth *DomainScopedAuthorization) getTenantAndDomainFilters(cond *ResourceC
 
 func getFilterByPropertyIfPresent(schema *Schema, propertyName string, propertyValue interface{}) []map[string]interface{} {
 	if _, err := schema.GetPropertyByID(propertyName); err == nil {
-		return []map[string]interface{} {
-			{
-				"property": propertyName,
-				"type": "eq",
-				"value": propertyValue,
-			},
+		return []map[string]interface{}{
+			filter.Eq(propertyName, propertyValue),
 		}
 	}
 	return nil
