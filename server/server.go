@@ -314,6 +314,7 @@ func NewServer(configFile string) (*Server, error) {
 		m.MapTo(&middleware.NoIdentityService{}, (*middleware.IdentityService)(nil))
 		auth := schema.NewAuthorizationBuilder().
 			WithTenant(schema.Tenant{ID: "admin", Name: "admin"}).
+			WithRoleIDs("admin").
 			BuildAdmin()
 		m.Map(auth)
 	}
