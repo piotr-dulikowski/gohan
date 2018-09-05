@@ -258,7 +258,7 @@ func (auth *TenantScopedAuthorization) TenantName() string {
 func (auth *TenantScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
 	tenantFilter := getFilterByPropertyIfPresent(schema, "tenant_id", auth.TenantID())
 	domainFilter := getFilterByPropertyIfPresent(schema, "domain_id", auth.DomainID())
-	return append(tenantFilter, domainFilter...)
+	return makeAndFilters(append(tenantFilter, domainFilter...))
 }
 
 func (auth *TenantScopedAuthorization) checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error {
@@ -885,4 +885,13 @@ func getRegexp(input string) (*regexp.Regexp, error) {
 		input = globalRegexp
 	}
 	return regexp.Compile(input)
+}
+
+func makeAndFilters(filters []map[string]interface{}) []map[string]interface{} {
+	if len(filters) <= 1 {
+		return filters
+	}
+	return []map[string]interface{}{
+		filter.And(filters...),
+	}
 }

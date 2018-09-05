@@ -717,14 +717,18 @@ var _ = Describe("Policies", func() {
 						{
 							"__and__": []map[string]interface{}{
 								{
-									"property": "tenant_id",
-									"type":     "eq",
-									"value":    testAuth.TenantID(),
-								},
-								{
-									"property": "domain_id",
-									"type":     "eq",
-									"value":    testAuth.DomainID(),
+									"__and__": []map[string]interface{}{
+										{
+											"property": "tenant_id",
+											"type":     "eq",
+											"value":    testAuth.TenantID(),
+										},
+										{
+											"property": "domain_id",
+											"type":     "eq",
+											"value":    testAuth.DomainID(),
+										},
+									},
 								},
 								{
 									"property": "state",
