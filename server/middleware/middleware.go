@@ -339,6 +339,8 @@ func Authentication() martini.Handler {
 			return
 		}
 
+		log.Debug("Current authorization is: %+v", auth)
+
 		c.Map(auth)
 		c.Next()
 	}
