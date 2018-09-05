@@ -32,6 +32,7 @@ var _ = Describe("Policies", func() {
 			adminTenantID      = "12345678aaaaaaaaaaaa123456789012"
 			demoTenantID       = "12345678bbbbbbbbbbbb123456789012"
 			adminAuth          Authorization
+			legacyAdminAuth    Authorization
 			memberAuth         Authorization
 		)
 
@@ -41,6 +42,11 @@ var _ = Describe("Policies", func() {
 			Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
 
 			adminAuth = NewAuthorizationBuilder().
+				WithTenant(Tenant{ID: adminTenantID, Name: "admin"}).
+				WithRoleIDs("admin").
+				BuildAdmin()
+			legacyAdminAuth = NewAuthorizationBuilder().
+				WithKeystoneV2Compatibility().
 				WithTenant(Tenant{ID: adminTenantID, Name: "admin"}).
 				WithRoleIDs("admin").
 				BuildScopedToTenant()
@@ -54,13 +60,17 @@ var _ = Describe("Policies", func() {
 			ClearManager()
 		})
 
-		It("creates network as admin", func() {
-			adminPolicy, role := manager.PolicyValidate("create", "/v2.0/networks", adminAuth)
-			Expect(adminPolicy).NotTo(BeNil())
-			Expect(role.Match("admin")).To(BeTrue())
-			currCond := adminPolicy.GetCurrentResourceCondition()
-			Expect(currCond.RequireOwner()).To(BeFalse(), "Admin should not require ownership")
-		})
+		DescribeTable("creates network as admin",
+			func(auth *Authorization) {
+				adminPolicy, role := manager.PolicyValidate("create", "/v2.0/networks", *auth)
+				Expect(adminPolicy).NotTo(BeNil())
+				Expect(role.Match("admin")).To(BeTrue())
+				currCond := adminPolicy.GetCurrentResourceCondition()
+				Expect(currCond.RequireOwner()).To(BeFalse(), "Admin should not require ownership")
+			},
+			Entry("Keystone V2 admin", &adminAuth),
+			Entry("Keystone V3 admin", &legacyAdminAuth),
+		)
 
 		It("creates network as member", func() {
 			memberPolicy, role := manager.PolicyValidate("create", "/v2.0/networks", memberAuth)
@@ -403,7 +413,7 @@ var _ = Describe("Policies", func() {
 			Describe("Effect property", func() {
 				BeforeEach(func() {
 					policy.Action = "*"
-					authorization = authorizationBuilder.WithRoleIDs("admin").BuildScopedToTenant()
+					authorization = authorizationBuilder.WithRoleIDs("admin").BuildAdmin()
 				})
 				It("should allow access be default", func() {
 					policy.Effect = ""

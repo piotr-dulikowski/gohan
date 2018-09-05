@@ -284,6 +284,7 @@ var _ = Describe("Keystone client", func() {
 				Expect(auth.TenantName()).To(Equal("acme"))
 				Expect(auth.DomainID()).To(Equal("domain-id"))
 				Expect(auth.DomainName()).To(Equal("domain"))
+				Expect(auth.IsAdmin()).To(BeFalse())
 			})
 
 			It("Should read tokens with domain scope", func() {
@@ -298,6 +299,22 @@ var _ = Describe("Keystone client", func() {
 				Expect(auth.TenantName()).To(Equal(""))
 				Expect(auth.DomainID()).To(Equal("domain-id"))
 				Expect(auth.DomainName()).To(Equal("domain"))
+				Expect(auth.IsAdmin()).To(BeFalse())
+			})
+
+			It("Should read tokens scoped to admin project", func() {
+				server.AppendHandlers(
+					ghttp.RespondWithJSONEncoded(201, getV3TokensAdminResponse()),
+					ghttp.RespondWithJSONEncoded(200, getV3TokensAdminResponse()),
+				)
+				setupV3Client()
+				auth, err := client.VerifyToken(token)
+				Expect(err).To(BeNil())
+				Expect(auth.TenantID()).To(Equal("admin-project-id"))
+				Expect(auth.TenantName()).To(Equal("admin-project"))
+				Expect(auth.DomainID()).To(Equal("default"))
+				Expect(auth.DomainName()).To(Equal("default"))
+				Expect(auth.IsAdmin()).To(BeTrue())
 			})
 		})
 	})

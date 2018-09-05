@@ -205,6 +205,7 @@ func (*FakeIdentity) VerifyToken(tokenID string) (schema.Authorization, error) {
 	}
 	role := access["user"].(map[string]interface{})["roles"].([]role)[0].Name
 	auth := schema.NewAuthorizationBuilder().
+		WithKeystoneV2Compatibility().
 		WithTenant(tenant).
 		WithRoleIDs(role).
 		BuildScopedToTenant()

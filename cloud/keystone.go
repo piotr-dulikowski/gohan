@@ -194,14 +194,17 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			ID:   project.Domain.ID,
 			Name: project.Domain.Name,
 		}
-		auth := schema.NewAuthorizationBuilder().
+		builder := schema.NewAuthorizationBuilder().
 			WithTenant(tenant).
 			WithDomain(domain).
-			WithRoleIDs(roleIDs...).
-			BuildScopedToTenant()
-		return auth, nil
+			WithRoleIDs(roleIDs...)
+
+		if isTokenScopedToAdminProject(&tokenResult) {
+			return builder.BuildAdmin(), nil
+		}
+		return builder.BuildScopedToTenant(), nil
 	} else {
-		dom, err := extractDomain(tokenResult)
+		dom, err := extractDomain(&tokenResult)
 		if err != nil {
 			return nil, err
 		}
@@ -258,12 +261,20 @@ func (client *keystoneV3Client) GetClient() *gophercloud.ServiceClient {
 	return client.client
 }
 
-func extractDomain(result v3tokens.GetResult) (*v3tokens.Domain, error) {
+func extractDomain(result *v3tokens.GetResult) (*v3tokens.Domain, error) {
 	var s struct {
 		Domain *v3tokens.Domain `json:"domain"`
 	}
 	err := result.ExtractInto(&s)
 	return s.Domain, err
+}
+
+func isTokenScopedToAdminProject(result *v3tokens.GetResult) bool {
+	var s struct {
+		IsAdminProject bool `json:"is_admin_project"`
+	}
+	err := result.ExtractInto(&s)
+	return (err == nil) && s.IsAdminProject
 }
 
 //VerifyToken verifies keystone v2.0 token
@@ -289,6 +300,7 @@ func (client *keystoneV2Client) VerifyToken(token string) (schema.Authorization,
 	tenantID := tenant["id"].(string)
 	tenantName := tenant["name"].(string)
 	auth := schema.NewAuthorizationBuilder().
+		WithKeystoneV2Compatibility().
 		WithTenant(schema.Tenant{ID: tenantID, Name: tenantName}).
 		WithRoleIDs(roleIDs...).
 		BuildScopedToTenant()

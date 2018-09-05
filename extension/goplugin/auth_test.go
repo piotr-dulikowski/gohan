@@ -33,11 +33,11 @@ const (
 var _ = Describe("Auth", func() {
 
 	var (
-		manager         *schema.Manager
-		adminAuth       schema.Authorization
-		adminOnDemoAuth schema.Authorization
-		memberAuth      schema.Authorization
-		env             goext.IEnvironment
+		manager               *schema.Manager
+		adminAuth             schema.Authorization
+		adminOnDemoAuth       schema.Authorization
+		memberAuth            schema.Authorization
+		env                   goext.IEnvironment
 	)
 
 	BeforeEach(func() {
@@ -45,19 +45,6 @@ var _ = Describe("Auth", func() {
 
 		Expect(manager.LoadSchemaFromFile(abstractSchemaPath)).To(Succeed())
 		Expect(manager.LoadSchemaFromFile(schemaPath)).To(Succeed())
-
-		adminAuth = schema.NewAuthorizationBuilder().
-			WithTenant(schema.Tenant{ID: adminTenantID, Name: "admin"}).
-			WithRoleIDs("admin").
-			BuildScopedToTenant()
-		adminOnDemoAuth = schema.NewAuthorizationBuilder().
-			WithTenant(schema.Tenant{ID: adminTenantID, Name: "demo"}).
-			WithRoleIDs("admin").
-			BuildScopedToTenant()
-		memberAuth = schema.NewAuthorizationBuilder().
-			WithTenant(schema.Tenant{ID: demoTenantID, Name: "demo"}).
-			WithRoleIDs("Member").
-			BuildScopedToTenant()
 
 		env = goplugin.NewEnvironment("test", nil, nil)
 	})
@@ -79,55 +66,117 @@ var _ = Describe("Auth", func() {
 		return context
 	}
 
-	Context("IsAdmin", func() {
-		It("Returns true for admin context", func() {
-			context := setup(adminAuth)
-			Expect(env.Auth().IsAdmin(context)).To(BeTrue())
+	Context("Keystone V2", func() {
+		BeforeEach(func() {
+			adminAuth = schema.NewAuthorizationBuilder().
+				WithKeystoneV2Compatibility().
+				WithTenant(schema.Tenant{ID: adminTenantID, Name: "admin"}).
+				WithRoleIDs("admin").
+				BuildScopedToTenant()
+			adminOnDemoAuth = schema.NewAuthorizationBuilder().
+				WithKeystoneV2Compatibility().
+				WithTenant(schema.Tenant{ID: adminTenantID, Name: "demo"}).
+				WithRoleIDs("admin").
+				BuildScopedToTenant()
+			memberAuth = schema.NewAuthorizationBuilder().
+				WithKeystoneV2Compatibility().
+				WithTenant(schema.Tenant{ID: demoTenantID, Name: "demo"}).
+				WithRoleIDs("Member").
+				BuildScopedToTenant()
 		})
 
-		It("Returns false for member context", func() {
-			context := setup(memberAuth)
-			Expect(env.Auth().IsAdmin(context)).To(BeFalse())
+		Context("IsAdmin", func() {
+			It("Returns true for admin context", func() {
+				context := setup(adminAuth)
+				Expect(env.Auth().IsAdmin(context)).To(BeTrue())
+			})
+
+			It("Returns true for admin user logged in as other tenant", func() {
+				context := setup(adminOnDemoAuth)
+				Expect(env.Auth().IsAdmin(context)).To(BeTrue())
+			})
 		})
 
-		It("Returns true for admin user logged in as other tenant", func() {
-			context := setup(adminOnDemoAuth)
-			Expect(env.Auth().IsAdmin(context)).To(BeTrue())
+		Context("GetTenantName", func() {
+			It("Returns admin for admin context", func() {
+				context := setup(adminAuth)
+				Expect(env.Auth().GetTenantName(context)).To(Equal("admin"))
+			})
+
+			It("Returns demo for admin user logged in as demo", func() {
+				context := setup(adminOnDemoAuth)
+				Expect(env.Auth().GetTenantName(context)).To(Equal("demo"))
+			})
+		})
+
+		Context("HasRole", func() {
+			It("Returns true for admin role in admin context", func() {
+				context := setup(adminAuth)
+				Expect(env.Auth().HasRole(context, "admin")).To(BeTrue())
+			})
+
+			It("Returns true for admin role when admin logged is as demo", func() {
+				context := setup(adminOnDemoAuth)
+				Expect(env.Auth().HasRole(context, "admin")).To(BeTrue())
+			})
 		})
 	})
 
-	Context("GetTenantName", func() {
-		It("Returns admin for admin context", func() {
-			context := setup(adminAuth)
-			Expect(env.Auth().GetTenantName(context)).To(Equal("admin"))
+	Context("Keystone V3", func() {
+		BeforeEach(func() {
+			adminAuth = schema.NewAuthorizationBuilder().
+				WithTenant(schema.Tenant{ID: adminTenantID, Name: "admin"}).
+				WithRoleIDs("admin").
+				BuildAdmin()
+			adminOnDemoAuth = schema.NewAuthorizationBuilder().
+				WithTenant(schema.Tenant{ID: adminTenantID, Name: "demo"}).
+				WithRoleIDs("admin").
+				BuildScopedToTenant()
+			memberAuth = schema.NewAuthorizationBuilder().
+				WithTenant(schema.Tenant{ID: demoTenantID, Name: "demo"}).
+				WithRoleIDs("Member").
+				BuildScopedToTenant()
 		})
 
-		It("Returns demo for demo context", func() {
-			context := setup(memberAuth)
-			Expect(env.Auth().GetTenantName(context)).To(Equal("demo"))
+		Context("IsAdmin", func() {
+			It("Returns true for admin context", func() {
+				context := setup(adminAuth)
+				Expect(env.Auth().IsAdmin(context)).To(BeTrue())
+			})
+
+			It("Returns false for member context", func() {
+				context := setup(memberAuth)
+				Expect(env.Auth().IsAdmin(context)).To(BeFalse())
+			})
+
+			It("Returns false for admin user logged in as other tenant", func() {
+				context := setup(adminOnDemoAuth)
+				Expect(env.Auth().IsAdmin(context)).To(BeFalse())
+			})
 		})
 
-		It("Returns demo for admin user logged in as demo", func() {
-			context := setup(adminOnDemoAuth)
-			Expect(env.Auth().GetTenantName(context)).To(Equal("demo"))
+		Context("GetTenantName", func() {
+			It("Returns admin for admin context", func() {
+				context := setup(adminAuth)
+				Expect(env.Auth().GetTenantName(context)).To(Equal("admin"))
+			})
+
+			It("Returns demo for demo context", func() {
+				context := setup(memberAuth)
+				Expect(env.Auth().GetTenantName(context)).To(Equal("demo"))
+			})
+
+			It("Returns demo for admin user logged in as demo", func() {
+				context := setup(adminOnDemoAuth)
+				Expect(env.Auth().GetTenantName(context)).To(Equal("demo"))
+			})
+		})
+
+		Context("HasRole", func() {
+			It("Returns false for admin role in demo context", func() {
+				context := setup(memberAuth)
+				Expect(env.Auth().HasRole(context, "admin")).To(BeFalse())
+			})
 		})
 	})
-
-	Context("HasRole", func() {
-		It("Returns true for admin role in admin context", func() {
-			context := setup(adminAuth)
-			Expect(env.Auth().HasRole(context, "admin")).To(BeTrue())
-		})
-
-		It("Returns false for admin role in demo context", func() {
-			context := setup(memberAuth)
-			Expect(env.Auth().HasRole(context, "admin")).To(BeFalse())
-		})
-
-		It("Returns true for admin role when admin logged is as demo", func() {
-			context := setup(adminOnDemoAuth)
-			Expect(env.Auth().HasRole(context, "admin")).To(BeTrue())
-		})
-	})
-
 })

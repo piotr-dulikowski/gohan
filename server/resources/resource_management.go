@@ -602,6 +602,11 @@ func CreateResource(
 
 	_, err = resourceSchema.GetPropertyByID("tenant_id")
 	if _, ok := dataMap["tenant_id"]; err == nil && !ok {
+		tenantID := auth.TenantID()
+		if tenantID == "" {
+			err := errors.New("A non-empty tenant_id should be provided in the request")
+			return ResourceError{err, err.Error(), WrongData}
+		}
 		dataMap["tenant_id"] = auth.TenantID()
 	}
 
