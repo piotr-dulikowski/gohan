@@ -77,9 +77,8 @@ var _ = Describe("Resource manager", func() {
 
 		adminAuth = schema.NewAuthorizationBuilder().
 			WithTenant(schema.Tenant{ID: adminTenantID, Name: "admin"}).
-			WithDomain(domainA).
 			WithRoleIDs("admin").
-			BuildScopedToTenant()
+			BuildAdmin()
 		memberAuth = schema.NewAuthorizationBuilder().
 			WithTenant(schema.Tenant{ID: memberTenantID, Name: "demo"}).
 			WithDomain(domainA).
@@ -1060,7 +1059,7 @@ var _ = Describe("Resource manager", func() {
 					Expect(err).NotTo(HaveOccurred())
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
-					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
+					Expect(theResource).To(HaveKeyWithValue("domain_id", schema.DefaultDomain.ID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
 					Expect(theResource).To(HaveKeyWithValue("id", adminResourceID))
 				})
@@ -1072,7 +1071,7 @@ var _ = Describe("Resource manager", func() {
 					result := context["response"].(map[string]interface{})
 					theResource, ok := result[schemaID]
 					Expect(ok).To(BeTrue())
-					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
+					Expect(theResource).To(HaveKeyWithValue("domain_id", schema.DefaultDomain.ID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
 					Expect(theResource).To(HaveKey("id"))
 				})
@@ -1159,6 +1158,14 @@ var _ = Describe("Resource manager", func() {
 					Expect(theResource).To(HaveKeyWithValue("domain_id", domainAID))
 					Expect(theResource).To(HaveKeyWithValue("tenant_id", adminTenantID))
 					Expect(theResource).To(HaveKeyWithValue("id", adminResourceID))
+				})
+
+				It("Should not create resource without tenant_id", func() {
+					err := resources.CreateResource(
+						context, testDB, fakeIdentity, currentSchema, map[string]interface{}{"id": adminResourceID})
+					Expect(err).To(HaveOccurred())
+					_, ok := err.(resources.ResourceError)
+					Expect(ok).To(BeTrue())
 				})
 			})
 

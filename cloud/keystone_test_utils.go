@@ -99,6 +99,46 @@ func getV3TokensScopedToDomainResponse() interface{} {
 	}
 }
 
+func getV3TokensAdminResponse() interface{} {
+	return map[string]interface{}{
+		"token": map[string]interface{}{
+			"expires_at": "2013-02-27T18:30:59.999999Z",
+			"issued_at":  "2013-02-27T16:30:59.999999Z",
+			"methods": []string{
+				"password",
+			},
+			"user": map[string]interface{}{
+				"domain": map[string]interface{}{
+					"id":   "111",
+					"name": "domain",
+				},
+				"id":   "1234",
+				"name": "admin",
+			},
+			"roles": []interface{}{
+				map[string]interface{}{
+					"id":   "51cc68287d524c759f47c811e6463340",
+					"name": "member",
+				},
+				map[string]interface{}{
+					"id":   "7f0ea059b6d84029b60c18169d3c1d9a",
+					"name": "admin",
+				},
+			},
+			"catalog": []interface{}{},
+			"project": map[string]interface{}{
+				"domain": map[string]interface{}{
+					"id":   "default",
+					"name": "default",
+				},
+				"id":   "admin-project-id",
+				"name": "admin-project",
+			},
+			"is_admin_project": true,
+		},
+	}
+}
+
 func getV3Unauthorized() interface{} {
 	return map[string]interface{}{
 		"error": map[string]interface{}{

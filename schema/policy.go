@@ -49,6 +49,8 @@ const (
 	globalRegexp = ".*"
 
 	onlyOneOfTenantIDTenantNameError = "Only one of [tenant_id, tenant_name] should be specified"
+
+	adminRole = "admin"
 )
 
 // AllActions are all possible actions
@@ -145,6 +147,7 @@ type Authorization interface {
 	DomainID() string
 	DomainName() string
 	Roles() []*Role
+	IsAdmin() bool
 	getResourceFilters(schema *Schema) []map[string]interface{}
 	checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error
 	getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string)
@@ -160,10 +163,17 @@ type DomainScopedAuthorization struct {
 	roles  []*Role
 }
 
+// AdminScopedAuthorization represents authorization for the admin,
+// i.e. an authorization scoped to an admin project
+type AdminAuthorization struct {
+	TenantScopedAuthorization
+}
+
 type AuthorizationBuilder struct {
-	tenant Tenant
-	domain Domain
-	roles  []*Role
+	authViaKeystoneV2 bool
+	tenant            Tenant
+	domain            Domain
+	roles             []*Role
 }
 
 func NewAuthorizationBuilder() *AuthorizationBuilder {
@@ -171,6 +181,11 @@ func NewAuthorizationBuilder() *AuthorizationBuilder {
 		domain: DefaultDomain,
 		roles:  []*Role{},
 	}
+}
+
+func (ab *AuthorizationBuilder) WithKeystoneV2Compatibility() *AuthorizationBuilder {
+	ab.authViaKeystoneV2 = true
+	return ab
 }
 
 func (ab *AuthorizationBuilder) WithTenant(tenant Tenant) *AuthorizationBuilder {
@@ -193,6 +208,15 @@ func (ab *AuthorizationBuilder) WithRoleIDs(roleIDs ...string) *AuthorizationBui
 }
 
 func (ab *AuthorizationBuilder) BuildScopedToTenant() Authorization {
+	if ab.authViaKeystoneV2 {
+		// When using Keystone V2, user is an admin if they have an admin role in the current project
+		for _, role := range ab.roles {
+			if role.Name == adminRole {
+				return ab.BuildAdmin()
+			}
+		}
+	}
+
 	return &TenantScopedAuthorization{
 		tenant: ab.tenant,
 		DomainScopedAuthorization: DomainScopedAuthorization{
@@ -206,6 +230,18 @@ func (ab *AuthorizationBuilder) BuildScopedToDomain() Authorization {
 	return &DomainScopedAuthorization{
 		domain: ab.domain,
 		roles:  ab.roles,
+	}
+}
+
+func (ab *AuthorizationBuilder) BuildAdmin() Authorization {
+	return &AdminAuthorization{
+		TenantScopedAuthorization: TenantScopedAuthorization{
+			tenant: ab.tenant,
+			DomainScopedAuthorization: DomainScopedAuthorization{
+				domain: ab.domain,
+				roles:  ab.roles,
+			},
+		},
 	}
 }
 
@@ -264,6 +300,10 @@ func (auth *DomainScopedAuthorization) Roles() []*Role {
 	return auth.roles
 }
 
+func (auth *DomainScopedAuthorization) IsAdmin() bool {
+	return false
+}
+
 func (auth *DomainScopedAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
 	return getFilterByPropertyIfPresent(schema, "domain_id", auth.DomainID())
 }
@@ -274,6 +314,24 @@ func (auth *DomainScopedAuthorization) checkAccessToResource(cond *ResourceCondi
 
 func (auth *DomainScopedAuthorization) getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string) {
 	domainFilter = []string{auth.DomainID()}
+	return
+}
+
+// AdminScopedAuthorization
+
+func (auth *AdminAuthorization) IsAdmin() bool {
+	return true
+}
+
+func (auth *AdminAuthorization) getResourceFilters(schema *Schema) []map[string]interface{} {
+	return []map[string]interface{}{}
+}
+
+func (auth *AdminAuthorization) checkAccessToResource(cond *ResourceCondition, action string, resource map[string]interface{}) error {
+	return nil
+}
+
+func (auth *AdminAuthorization) getTenantAndDomainFilters(cond *ResourceCondition, action string) (tenantFilter []string, domainFilter []string) {
 	return
 }
 

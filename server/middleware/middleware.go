@@ -220,7 +220,7 @@ func (i *NoIdentityService) VerifyToken(string) (schema.Authorization, error) {
 	auth := schema.NewAuthorizationBuilder().
 		WithTenant(adminTenant).
 		WithRoleIDs("admin").
-		BuildScopedToTenant()
+		BuildAdmin()
 	return auth, nil
 }
 
@@ -229,7 +229,7 @@ func (i *NoIdentityService) GetServiceAuthorization() (schema.Authorization, err
 	auth := schema.NewAuthorizationBuilder().
 		WithTenant(adminTenant).
 		WithRoleIDs("admin").
-		BuildScopedToTenant()
+		BuildAdmin()
 	return auth, nil
 }
 
