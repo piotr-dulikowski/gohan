@@ -16,11 +16,14 @@
 package schema
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+)
+
+const (
+	tenantProhibitedError = "Operating on resources from other tenant is prohibited"
+	domainProhibitedError = "Operating on resources from other domain is prohibited"
 )
 
 var _ = Describe("Policies", func() {
@@ -396,7 +399,7 @@ var _ = Describe("Policies", func() {
 					}).
 					BuildScopedToTenant()
 				err := policy.Check("create", authorization, data)
-				Expect(err).To(MatchError(getTenantProhibitedError("notOwnerName (notOwnerID)", "userName (userID)")))
+				Expect(err).To(MatchError(tenantProhibitedError))
 			})
 
 			It("should not pass check - different domain", func() {
@@ -407,7 +410,7 @@ var _ = Describe("Policies", func() {
 					}).
 					BuildScopedToDomain()
 				err := policy.Check("create", authorization, data)
-				Expect(err).To(MatchError(getDomainProhibitedError("otherDomainName (otherDomainID)", "domainName (domainID)")))
+				Expect(err).To(MatchError(domainProhibitedError))
 			})
 
 			Describe("Effect property", func() {
@@ -783,11 +786,3 @@ var _ = Describe("Policies", func() {
 		})
 	})
 })
-
-func getTenantProhibitedError(caller, owner string) string {
-	return fmt.Sprintf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
-}
-
-func getDomainProhibitedError(caller, owner string) string {
-	return fmt.Sprintf("User from domain '%s' is prohibited from operating on resources from domain '%s'", caller, owner)
-}

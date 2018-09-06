@@ -115,7 +115,7 @@ var _ = Describe("Auth", func() {
 				Expect(env.Auth().HasRole(context, "admin")).To(BeTrue())
 			})
 
-			It("Returns true for admin role when admin logged is as demo", func() {
+			It("Returns true for admin role when admin logged in as demo", func() {
 				context := setup(adminOnDemoAuth)
 				Expect(env.Auth().HasRole(context, "admin")).To(BeTrue())
 			})

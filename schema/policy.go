@@ -367,7 +367,7 @@ func checkTenantAccess(cond *ResourceCondition, action string, tenant Tenant, re
 	caller := newTenantMatcher(tenant.ID, tenant.Name)
 
 	if caller.notEqual(owner) && !cond.isTenantAllowed(action, owner, caller) {
-		return fmt.Errorf("Tenant '%s' is prohibited from operating on resources of tenant '%s'", caller, owner)
+		return errors.New("Operating on resources from other tenant is prohibited")
 	}
 
 	return nil
@@ -375,12 +375,8 @@ func checkTenantAccess(cond *ResourceCondition, action string, tenant Tenant, re
 
 func checkDomainAccess(domain Domain, resource map[string]interface{}) error {
 	resourceDomainID, setsDomain := resource["domain_id"].(string)
-	resourceDomainName, _ := resource["domain_name"].(string)
 	if setsDomain && domain.ID != resourceDomainID {
-		return fmt.Errorf("User from domain '%s (%s)' is prohibited from operating on resources from domain '%s (%s)'",
-			domain.Name, domain.ID,
-			resourceDomainName, resourceDomainID,
-		)
+		return errors.New("Operating on resources from other domain is prohibited")
 	}
 
 	return nil
