@@ -313,6 +313,8 @@ func GetMultipleResources(context middleware.Context, dataStore db.DB, resourceS
 		return err
 	}
 
+	log.Debug("Current policy is %#v", policy)
+
 	currCond := policy.GetCurrentResourceCondition()
 
 	filter := FilterFromQueryParameter(resourceSchema, queryParameters)
