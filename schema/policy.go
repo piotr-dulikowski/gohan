@@ -60,7 +60,7 @@ var adminPolicy = func() *Policy {
 	policy, err := NewPolicy(map[string]interface{}{
 		"action": "*",
 		"effect": "allow",
-		"id": "admin_statement",
+		"id": "admin_statement_tralalala",
 		"principal": "admin",
 		"resource": map[string]interface{}{
 			"path": ".*",
@@ -873,7 +873,7 @@ func addCustomFilters(schema *Schema, f map[string]interface{}, auth Authorizati
 
 //PolicyValidate validates api request using policy validation
 func PolicyValidate(action, path string, auth Authorization, policies []*Policy) (foundPolicy *Policy, foundRole *Role) {
-	log.Debug("PolicyValidate: %s, %s, %#v, %v", action, path, auth, policies)
+	log.Debug("PolicyValidate: %s, %s, %#v, %#v", action, path, auth, policies)
 	if auth.IsAdmin() {
 		policies = append(policies, adminPolicy)
 	}
