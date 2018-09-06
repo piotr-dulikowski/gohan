@@ -170,6 +170,10 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 		return nil, fmt.Errorf("Invalid token")
 	}
 
+	log.Debug("Verifying keystone v3.0 token")
+	log.Debug("Contents: %#v", tokenResult.Body)
+	defer log.Debug("Ended verifying keystone token")
+
 	// Get roles
 	roles, err := tokenResult.ExtractRoles()
 	if err != nil {
@@ -179,6 +183,8 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 	for _, r := range roles {
 		roleIDs = append(roleIDs, r.Name)
 	}
+
+	log.Debug("Token roles: %#v", roleIDs)
 
 	// Get project/tenant
 	project, err := tokenResult.ExtractProject()
@@ -200,8 +206,14 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			WithRoleIDs(roleIDs...)
 
 		if isTokenScopedToAdminProject(&tokenResult) {
+			log.Debug("Token is scoped to ADMIN")
+			log.Debug("Tenant: %#v", tenant)
+			log.Debug("Domain: %#v", domain)
 			return builder.BuildAdmin(), nil
 		}
+		log.Debug("Token is scoped to PROJECT")
+		log.Debug("Tenant: %#v", tenant)
+		log.Debug("Domain: %#v", domain)
 		return builder.BuildScopedToTenant(), nil
 	} else {
 		dom, err := extractDomain(&tokenResult)
@@ -215,6 +227,8 @@ func (client *keystoneV3Client) VerifyToken(token string) (schema.Authorization,
 			ID:   dom.ID,
 			Name: dom.Name,
 		}
+		log.Debug("Token is scoped to DOMAIN")
+		log.Debug("Domain: %#v", domain)
 		auth := schema.NewAuthorizationBuilder().
 			WithDomain(domain).
 			WithRoleIDs(roleIDs...).
@@ -274,6 +288,7 @@ func isTokenScopedToAdminProject(result *v3tokens.GetResult) bool {
 		IsAdminProject bool `json:"is_admin_project"`
 	}
 	err := result.ExtractInto(&s)
+	log.Debug("isTokenScopedToAdminProject: %#v %#v", err, s.IsAdminProject)
 	return (err == nil) && s.IsAdminProject
 }
 
