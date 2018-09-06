@@ -56,6 +56,22 @@ const (
 // AllActions are all possible actions
 var AllActions = []string{ActionCreate, ActionRead, ActionUpdate, ActionDelete}
 
+var adminPolicy = func() *Policy {
+	policy, err := NewPolicy(map[string]interface{}{
+		"action": "*",
+		"effect": "allow",
+		"id": "admin_statement",
+		"principal": "admin",
+		"resource": map[string]interface{}{
+			"path": ".*",
+		},
+	})
+	if err != nil {
+		panic(errors.Errorf("Failed to create the admin policy: %v", err))
+	}
+	return policy
+}()
+
 func newTenantMatcher(tenantID, tenantName string) tenantMatcher {
 	tenantIDRegexp, _ := getRegexp(tenantID)
 	tenantNameRegexp, _ := getRegexp(tenantName)
@@ -857,6 +873,9 @@ func addCustomFilters(schema *Schema, f map[string]interface{}, auth Authorizati
 
 //PolicyValidate validates api request using policy validation
 func PolicyValidate(action, path string, auth Authorization, policies []*Policy) (foundPolicy *Policy, foundRole *Role) {
+	if auth.IsAdmin() {
+		policies = append(policies, adminPolicy)
+	}
 	for _, policy := range policies {
 		if role := policy.match(action, path, auth); role != nil {
 			if policy.IsDeny() {
