@@ -421,7 +421,7 @@ var _ = Describe("Policies", func() {
 				It("should allow access be default", func() {
 					policy.Effect = ""
 					receivedPolicy, role := PolicyValidate("create", "/abc", authorization, []*Policy{policy})
-					Expect(receivedPolicy).To(Equal(policy))
+					Expect(receivedPolicy.ID).To(Equal("admin_statement"))
 					Expect(role).To(Equal(&Role{"admin"}))
 				})
 
