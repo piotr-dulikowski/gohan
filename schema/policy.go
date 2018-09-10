@@ -870,7 +870,7 @@ func addCustomFilters(schema *Schema, f map[string]interface{}, auth Authorizati
 //PolicyValidate validates api request using policy validation
 func PolicyValidate(action, path string, auth Authorization, policies []*Policy) (foundPolicy *Policy, foundRole *Role) {
 	if auth.IsAdmin() {
-		policies = append(policies, adminPolicy)
+		policies = append([]*Policy{adminPolicy}, policies...)
 	}
 	for _, policy := range policies {
 		if role := policy.match(action, path, auth); role != nil {
