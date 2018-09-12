@@ -869,14 +869,26 @@ func addCustomFilters(schema *Schema, f map[string]interface{}, auth Authorizati
 
 //PolicyValidate validates api request using policy validation
 func PolicyValidate(action, path string, auth Authorization, policies []*Policy) (foundPolicy *Policy, foundRole *Role) {
+	log.Notice("PolicyValidate: start")
+	defer func() {
+		if foundPolicy != nil {
+			log.Notice("Matched policy: %#v, role: %#v", foundPolicy, foundRole)
+		} else {
+			log.Notice("Policy for the given action was not found")
+		}
+	}()
 	if auth.IsAdmin() {
 		policies = append([]*Policy{adminPolicy}, policies...)
 	}
 	for _, policy := range policies {
+		log.Notice("  Trying policy: %s", policy.ID)
 		if role := policy.match(action, path, auth); role != nil {
+			log.Notice("    Matched role: %s", role.Name)
 			if policy.IsDeny() {
+				log.Notice("    Policy denies access")
 				return nil, nil
 			} else if foundPolicy == nil {
+				log.Notice("    Found!")
 				foundPolicy = policy
 				foundRole = role
 			}
