@@ -394,7 +394,7 @@ type Domain struct {
 
 var DefaultDomain = Domain{
 	ID:   "default",
-	Name: "default",
+	Name: "Default",
 }
 
 //Role describes user role
