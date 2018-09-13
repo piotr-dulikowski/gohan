@@ -880,6 +880,16 @@ func PolicyValidate(action, path string, auth Authorization, policies []*Policy)
 	if auth.IsAdmin() {
 		policies = append([]*Policy{adminPolicy}, policies...)
 	}
+	log.Notice("  Authorization:")
+	log.Notice("    Tenant ID: %s", auth.TenantID())
+	log.Notice("    Tenant Name: %s", auth.TenantName())
+	log.Notice("    Domain ID: %s", auth.DomainID())
+	log.Notice("    Domain Name: %s", auth.DomainName())
+	log.Notice("    Is Admin: %b", auth.IsAdmin())
+	log.Notice("    Roles:")
+	for _, role := range auth.Roles() {
+		log.Notice("      %s", role.Name)
+	}
 	for _, policy := range policies {
 		log.Notice("  Trying policy: %s", policy.ID)
 		if role := policy.match(action, path, auth); role != nil {
