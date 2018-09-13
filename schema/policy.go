@@ -709,6 +709,14 @@ func PolicyValidate(action, path string, auth Authorization, policies []*Policy)
 			log.Notice("Policy for the given action was not found")
 		}
 	}()
+	log.Notice("  Authorization:")
+	log.Notice("    Tenant ID: %s", auth.TenantID())
+	log.Notice("    Tenant Name: %s", auth.TenantName())
+	log.Notice("    Auth Token: %s", auth.AuthToken())
+	log.Notice("    Roles:")
+	for _, role := range auth.Roles() {
+		log.Notice("      %s", role.Name)
+	}
 	for _, policy := range policies {
 		log.Notice("  Trying policy: %s", policy.ID)
 		if role := policy.match(action, path, auth); role != nil {
