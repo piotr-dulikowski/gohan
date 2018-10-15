@@ -181,6 +181,7 @@ func doTemplate(c *cli.Context) {
 		}
 	}
 	schemas := manager.OrderedSchemas()
+	schemasMap := manager.Schemas()
 
 	if err != nil {
 		util.ExitFatal(err)
@@ -200,11 +201,11 @@ func doTemplate(c *cli.Context) {
 	schemasWithPolicy := filterSchemasForPolicy(policy, policies, schemas)
 	convertCustomActionOutput(schemasWithPolicy)
 	if c.IsSet("split-by-resource-group") {
-		applyTemplateForEachResourceGroup(schemasWithPolicy, tpl, version, description, outputPath)
+		applyTemplateForEachResourceGroup(schemasWithPolicy, schemasMap, tpl, version, description, outputPath)
 	} else if c.IsSet("split-by-resource") {
-		applyTemplateForEachResource(schemasWithPolicy, tpl, outputPath)
+		applyTemplateForEachResource(schemasWithPolicy, schemasMap, tpl, outputPath)
 	} else {
-		applyTemplateForAll(schemasWithPolicy, tpl, title, version, description, outputPath)
+		applyTemplateForAll(schemasWithPolicy, schemasMap, tpl, title, version, description, outputPath)
 	}
 }
 
@@ -221,8 +222,8 @@ func convertCustomActionOutput(schemas []*SchemaWithPolicy) {
 	}
 }
 
-func applyTemplateForAll(schemas []*SchemaWithPolicy, tpl *pongo2.Template, title, version, description, outputPath string) {
-	output, err := tpl.Execute(pongo2.Context{"schemas": schemas, "title": title, "version": version, "description": description})
+func applyTemplateForAll(schemas []*SchemaWithPolicy, schemasMap schema.Map, tpl *pongo2.Template, title, version, description, outputPath string) {
+	output, err := tpl.Execute(pongo2.Context{"schemas": schemas, "schemasMap": schemasMap, "title": title, "version": version, "description": description})
 	if err != nil {
 		util.ExitFatal(err)
 		return
@@ -234,10 +235,10 @@ func applyTemplateForAll(schemas []*SchemaWithPolicy, tpl *pongo2.Template, titl
 	}
 }
 
-func applyTemplateForEachResourceGroup(schemas []*SchemaWithPolicy, tpl *pongo2.Template, version, description, outputPath string) {
+func applyTemplateForEachResourceGroup(schemas []*SchemaWithPolicy, schemasMap schema.Map, tpl *pongo2.Template, version, description, outputPath string) {
 	for _, resourceGroup := range getAllResourceGroupsFromSchemas(schemas) {
 		resourceSchemas := filerSchemasByResourceGroup(resourceGroup, schemas)
-		output, err := tpl.Execute(pongo2.Context{"schemas": resourceSchemas, "title": resourceGroup, "version": version, "description": description})
+		output, err := tpl.Execute(pongo2.Context{"schemas": resourceSchemas, "schemasMap": schemasMap, "title": resourceGroup, "version": version, "description": description})
 		if err != nil {
 			util.ExitFatal(err)
 			return
@@ -247,13 +248,13 @@ func applyTemplateForEachResourceGroup(schemas []*SchemaWithPolicy, tpl *pongo2.
 	}
 }
 
-func applyTemplateForEachResource(schemas []*SchemaWithPolicy, tpl *pongo2.Template, outputPath string) {
+func applyTemplateForEachResource(schemas []*SchemaWithPolicy, schemasMap schema.Map, tpl *pongo2.Template, outputPath string) {
 	for _, schemaWithPolicy := range schemas {
 		schema := schemaWithPolicy.Schema
 		if schema.Metadata["type"] == "metaschema" || schema.Type == "abstract" {
 			continue
 		}
-		output, err := tpl.Execute(pongo2.Context{"schema": schemaWithPolicy})
+		output, err := tpl.Execute(pongo2.Context{"schema": schemaWithPolicy, "schemasMap": schemasMap})
 		if err != nil {
 			util.ExitFatal(err)
 			return
