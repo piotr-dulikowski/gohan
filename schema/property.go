@@ -15,11 +15,13 @@
 
 package schema
 
+import "github.com/cloudwan/gohan/util"
+
 //Property is a definition of each Property
 type Property struct {
 	ID, Title, Description string
 	Type, Format           string
-	Properties             map[string]interface{}
+	Properties             []*Property
 	Relation               string
 	RelationColumn         string
 	RelationProperty       string
@@ -28,6 +30,7 @@ type Property struct {
 	SQLType                string
 	OnDeleteCascade        bool
 	Default                interface{}
+	DefaultMask            interface{}
 	Indexed                bool
 }
 
@@ -35,7 +38,7 @@ type Property struct {
 type PropertyMap map[string]Property
 
 //NewProperty is a constructor for Property type
-func NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty, sqlType string, unique, nullable, onDeleteCascade bool, properties map[string]interface{}, defaultValue interface{}, indexed bool) Property {
+func NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty, sqlType string, unique, nullable, onDeleteCascade bool, properties []*Property, defaultValue interface{}, indexed bool) Property {
 	Property := Property{
 		ID:               id,
 		Title:            title,
@@ -83,36 +86,59 @@ func NewPropertyFromObj(id string, rawTypeData interface{}, required bool) *Prop
 	relationProperty, _ := typeData["relation_property"].(string)
 	unique, _ := typeData["unique"].(bool)
 	cascade, _ := typeData["on_delete_cascade"].(bool)
-	properties, _ := typeData["properties"].(map[string]interface{})
 	defaultValue, _ := typeData["default"]
 	if !required && defaultValue == nil {
 		nullable = true
 	}
 	sqlType, _ := typeData["sql"].(string)
 	indexed, _ := typeData["indexed"].(bool)
-	Property := NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty,
+
+	properties := []*Property{}
+	if typeID == "object" {
+		properties = parseSubproperties(typeData)
+	}
+
+	property := NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty,
 		sqlType, unique, nullable, cascade, properties, defaultValue, indexed)
-	return &Property
+	property.generateDefaultMask()
+	return &property
 }
 
-func (p *Property) getDefaultMask() interface{} {
-	if p.Default != nil {
-		return p.Default
-	}
-	if p.Type == "object" {
-		var defaultValue map[string]interface{}
-		for innerPropertyID, innerPropertyValue := range p.Properties {
-			prop := NewPropertyFromObj(innerPropertyID, innerPropertyValue, false)
-			innerDefaultMask := prop.getDefaultMask()
-			if innerDefaultMask != nil {
-				if defaultValue == nil {
-					defaultValue = map[string]interface{}{}
-				}
-				defaultValue[innerPropertyID] = innerDefaultMask
-			}
-		}
-		return defaultValue
+func parseSubproperties(typeData map[string]interface{}) []*Property {
+	required, _ := typeData["required"].([]string)
+	properties, _ := typeData["properties"].(map[string]interface{})
+
+	parsedProperties := []*Property{}
+
+	for innerPropertyID, innerPropertyDesc := range properties {
+		isRequired := util.ContainsString(required, innerPropertyID)
+		parsedProperty := NewPropertyFromObj(innerPropertyID, innerPropertyDesc, isRequired)
+		parsedProperties = append(parsedProperties, parsedProperty)
 	}
 
-	return nil
+	return parsedProperties
+}
+
+func (p *Property) generateDefaultMask() {
+	if p.Default != nil {
+		p.DefaultMask = p.Default
+		return
+	}
+	if p.Type != "object" {
+		p.DefaultMask = nil
+		return
+	}
+
+	var defaultMask map[string]interface{}
+	for _, prop := range p.Properties {
+		prop.generateDefaultMask()
+		if prop.DefaultMask != nil {
+			if defaultMask == nil {
+				defaultMask = map[string]interface{}{}
+			}
+			defaultMask[prop.ID] = prop.DefaultMask
+		}
+	}
+
+	p.DefaultMask = defaultMask
 }
