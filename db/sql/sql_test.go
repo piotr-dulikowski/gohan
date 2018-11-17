@@ -298,6 +298,7 @@ var _ = Describe("Sql", func() {
 					false,
 					nil,
 					nil,
+					nil,
 					false,
 				))
 				table, _, err := sqlConn.AlterTableDef(server, false)
@@ -341,6 +342,7 @@ var _ = Describe("Sql", func() {
 					false,
 					nil,
 					nil,
+					nil,
 					false,
 				))
 				table, _, err := sqlConn.AlterTableDef(server, true)
@@ -362,6 +364,7 @@ var _ = Describe("Sql", func() {
 					false,
 					false,
 					false,
+					nil,
 					nil,
 					nil,
 					true,

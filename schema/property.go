@@ -21,7 +21,8 @@ import "github.com/cloudwan/gohan/util"
 type Property struct {
 	ID, Title, Description string
 	Type, Format           string
-	Properties             []*Property
+	Properties             []Property
+	Items                  *Property
 	Relation               string
 	RelationColumn         string
 	RelationProperty       string
@@ -38,7 +39,7 @@ type Property struct {
 type PropertyMap map[string]Property
 
 //NewProperty is a constructor for Property type
-func NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty, sqlType string, unique, nullable, onDeleteCascade bool, properties []*Property, defaultValue interface{}, indexed bool) Property {
+func NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty, sqlType string, unique, nullable, onDeleteCascade bool, properties []Property, items *Property, defaultValue interface{}, indexed bool) Property {
 	Property := Property{
 		ID:               id,
 		Title:            title,
@@ -52,6 +53,7 @@ func NewProperty(id, title, description, typeID, format, relation, relationColum
 		Nullable:         nullable,
 		Default:          defaultValue,
 		Properties:       properties,
+		Items:            items,
 		SQLType:          sqlType,
 		OnDeleteCascade:  onDeleteCascade,
 		Indexed:          indexed,
@@ -61,7 +63,7 @@ func NewProperty(id, title, description, typeID, format, relation, relationColum
 
 //NewPropertyFromObj make Property  from obj
 func NewPropertyFromObj(id string, rawTypeData interface{}, required bool) *Property {
-	typeData := rawTypeData.(map[string]interface{})
+	typeData, _ := rawTypeData.(map[string]interface{})
 	title, _ := typeData["title"].(string)
 	description, _ := typeData["description"].(string)
 	var typeID string
@@ -93,27 +95,32 @@ func NewPropertyFromObj(id string, rawTypeData interface{}, required bool) *Prop
 	sqlType, _ := typeData["sql"].(string)
 	indexed, _ := typeData["indexed"].(bool)
 
-	properties := []*Property{}
+	var items *Property
+	if itemsRaw, hasItems := typeData["items"]; hasItems {
+		items = NewPropertyFromObj("[]", itemsRaw, true)
+	}
+
+	properties := []Property{}
 	if typeID == "object" {
 		properties = parseSubproperties(typeData)
 	}
 
 	property := NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty,
-		sqlType, unique, nullable, cascade, properties, defaultValue, indexed)
+		sqlType, unique, nullable, cascade, properties, items, defaultValue, indexed)
 	property.generateDefaultMask()
 	return &property
 }
 
-func parseSubproperties(typeData map[string]interface{}) []*Property {
+func parseSubproperties(typeData map[string]interface{}) []Property {
 	required, _ := typeData["required"].([]string)
 	properties, _ := typeData["properties"].(map[string]interface{})
 
-	parsedProperties := []*Property{}
+	parsedProperties := []Property{}
 
 	for innerPropertyID, innerPropertyDesc := range properties {
 		isRequired := util.ContainsString(required, innerPropertyID)
 		parsedProperty := NewPropertyFromObj(innerPropertyID, innerPropertyDesc, isRequired)
-		parsedProperties = append(parsedProperties, parsedProperty)
+		parsedProperties = append(parsedProperties, *parsedProperty)
 	}
 
 	return parsedProperties

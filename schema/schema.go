@@ -445,6 +445,26 @@ func (schema *Schema) HasPropertyID(id string) bool {
 	return err == nil
 }
 
+// GetAllPropertiesFullIDs returns fully qualified IDs of all properties, including nested ones
+func (schema *Schema) GetAllPropertiesFullIDs() []string {
+	var gather func(string, []Property) []string
+	gather = func(prefix string, properties []Property) []string {
+		ret := []string{}
+		for _, prop := range properties {
+			ret = append(ret, prefix+prop.ID)
+			newPrefix := prefix + prop.ID + "."
+			ret = append(ret, gather(newPrefix, prop.Properties)...)
+			if prop.Items != nil {
+				arrayPrefix := newPrefix + "[]."
+				ret = append(ret, gather(arrayPrefix, prop.Items.Properties)...)
+			}
+		}
+		return ret
+	}
+
+	return gather("", schema.Properties)
+}
+
 //StateVersioning whether resources created from this schema should track state and config versions
 func (schema *Schema) StateVersioning() bool {
 	statefulRaw, ok := schema.Metadata["state_versioning"]

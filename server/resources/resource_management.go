@@ -1128,19 +1128,15 @@ func validateAttachment(
 ) error {
 	relationPropertyName := policy.GetRelationPropertyName()
 	if relationPropertyName == "*" {
-		for i := range resourceSchema.Properties {
-			prop := &resourceSchema.Properties[i]
-			if err := validateAttachmentRelation(context, policy, auth, dataMap, prop); err != nil {
+		for _, path := range resourceSchema.GetAllPropertiesFullIDs() {
+			err := validateAttachmentRelationUnderPath(context, policy, auth, dataMap, resourceSchema, path)
+			if err != nil {
 				return err
 			}
 		}
 		return nil
 	} else {
-		prop, err := resourceSchema.GetPropertyByID(relationPropertyName)
-		if err != nil {
-			return err
-		}
-		return validateAttachmentRelation(context, policy, auth, dataMap, prop)
+		return validateAttachmentRelationUnderPath(context, policy, auth, dataMap, resourceSchema, relationPropertyName)
 	}
 }
 
@@ -1170,24 +1166,88 @@ func extendFilterByTenantAndDomain(
 	}
 }
 
-func validateAttachmentRelation(
+func validateAttachmentRelationUnderPath(
 	context middleware.Context,
 	policy *schema.Policy,
 	auth schema.Authorization,
-	dataMap map[string]interface{},
-	property *schema.Property,
+	data interface{},
+	resourceSchema *schema.Schema,
+	path string,
 ) error {
-	manager := schema.GetManager()
-	if property.Relation == "" {
+	var currProp *schema.Property
+	currChildren := resourceSchema.Properties
+	dataSet := []interface{}{data}
+
+outer:
+	for _, key := range strings.Split(path, ".") {
+		if key == "[]" {
+			if currProp == nil {
+				// Invalid path - tried to treat top level object as an array
+				return fmt.Errorf("Invalid path: %s", path)
+			}
+			currProp = currProp.Items
+			currChildren = currProp.Properties
+
+			var newDataSet []interface{}
+			for _, dataPiece := range dataSet {
+				dataPieceArray, _ := dataPiece.([]interface{})
+				newDataSet = append(newDataSet, dataPieceArray...)
+			}
+
+			dataSet = newDataSet
+
+			continue outer
+		}
+
+		for i := range currChildren {
+			if currChildren[i].ID == key {
+				currProp = &currChildren[i]
+				currChildren = currProp.Properties
+
+				for j, dataPiece := range dataSet {
+					dataPieceMap, _ := dataPiece.(map[string]interface{})
+					dataSet[j], _ = dataPieceMap[key]
+				}
+
+				continue outer
+			}
+		}
+		break
+	}
+
+	if currProp == nil {
+		return fmt.Errorf("Property under path %s not found in schema %s", path, resourceSchema.ID)
+	}
+
+	if currProp.Relation == "" {
 		// Not a relation, so skip
 		return nil
 	}
 
-	relatedSchema, _ := manager.Schema(property.Relation)
-	relatedResourceID, _ := dataMap[property.ID].(string)
+	for _, dataPiece := range dataSet {
+		relatedResourceID, _ := dataPiece.(string)
+		err := validateAttachmentRelation(context, policy, auth, currProp, relatedResourceID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateAttachmentRelation(
+	context middleware.Context,
+	policy *schema.Policy,
+	auth schema.Authorization,
+	property *schema.Property,
+	relatedResourceID string,
+) error {
 	if relatedResourceID == "" {
 		return nil
 	}
+
+	manager := schema.GetManager()
+	relatedSchema, _ := manager.Schema(property.Relation)
 
 	otherCond := policy.GetOtherResourceCondition()
 	filter := transaction.IDFilter(relatedResourceID)
