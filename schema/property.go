@@ -38,6 +38,8 @@ type Property struct {
 //PropertyMap is a map of Property
 type PropertyMap map[string]Property
 
+const ItemPropertyID = "[]"
+
 //NewProperty is a constructor for Property type
 func NewProperty(id, title, description, typeID, format, relation, relationColumn, relationProperty, sqlType string, unique, nullable, onDeleteCascade bool, properties []Property, items *Property, defaultValue interface{}, indexed bool) Property {
 	Property := Property{
@@ -97,7 +99,7 @@ func NewPropertyFromObj(id string, rawTypeData interface{}, required bool) *Prop
 
 	var items *Property
 	if itemsRaw, hasItems := typeData["items"]; hasItems {
-		items = NewPropertyFromObj("[]", itemsRaw, true)
+		items = NewPropertyFromObj(ItemPropertyID, itemsRaw, true)
 	}
 
 	properties := []Property{}

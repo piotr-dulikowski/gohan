@@ -1128,7 +1128,7 @@ func validateAttachment(
 ) error {
 	relationPropertyName := policy.GetRelationPropertyName()
 	if relationPropertyName == "*" {
-		for _, path := range resourceSchema.GetAllPropertiesFullIDs() {
+		for path := range resourceSchema.GetAllPropertiesFullyQualifiedMap() {
 			err := validateAttachmentRelationUnderPath(context, policy, auth, dataMap, resourceSchema, path)
 			if err != nil {
 				return err
@@ -1180,7 +1180,7 @@ func validateAttachmentRelationUnderPath(
 
 outer:
 	for _, key := range strings.Split(path, ".") {
-		if key == "[]" {
+		if key == schema.ItemPropertyID {
 			if currProp == nil {
 				// Invalid path - tried to treat top level object as an array
 				return fmt.Errorf("Invalid path: %s", path)
