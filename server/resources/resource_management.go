@@ -1152,6 +1152,10 @@ func errorBadRequest(schemaId, resourceId string) error {
 	return goext.NewErrorBadRequest(relatedResourceNotFoundErr(schemaId, resourceId))
 }
 
+func errorInvalidPropertyPath(schemaId, path string) error {
+	return fmt.Errorf("Property under path %s not found in schema %s", path, schemaId)
+}
+
 func extendFilterByTenantAndDomain(
 	schema *schema.Schema,
 	filter transaction.Filter, action string,
@@ -1178,9 +1182,16 @@ func validateAttachmentRelationUnderPath(
 	currChildren := resourceSchema.Properties
 	dataSet := []interface{}{data}
 
+	log.Debug("Validating attachment policy \"%s\" for property: %s", policy.ID, path)
+
 outer:
 	for _, key := range strings.Split(path, ".") {
+		log.Debug("Currently, %d pieces are in the data set", len(dataSet))
+		log.Debug("The dataSet is %#v", dataSet)
+
+		log.Debug("Currently analyzing key %s", key)
 		if key == schema.ItemPropertyID {
+			log.Debug("This is an item property key")
 			if currProp == nil {
 				// Invalid path - tried to treat top level object as an array
 				return fmt.Errorf("Invalid path: %s", path)
@@ -1190,8 +1201,14 @@ outer:
 
 			var newDataSet []interface{}
 			for _, dataPiece := range dataSet {
-				dataPieceArray, _ := dataPiece.([]interface{})
+				log.Debug("Fragment id %#v", dataPiece)
+				dataPieceArray, ok := dataPiece.([]interface{})
 				newDataSet = append(newDataSet, dataPieceArray...)
+				if !ok {
+					log.Debug("Non-conforming element!")
+				} else {
+					log.Debug("Good element")
+				}
 			}
 
 			dataSet = newDataSet
@@ -1199,6 +1216,7 @@ outer:
 			continue outer
 		}
 
+		log.Debug("This is a property key")
 		for i := range currChildren {
 			if currChildren[i].ID == key {
 				currProp = &currChildren[i]
@@ -1206,24 +1224,31 @@ outer:
 
 				for j, dataPiece := range dataSet {
 					dataPieceMap, _ := dataPiece.(map[string]interface{})
-					dataSet[j], _ = dataPieceMap[key]
+					if extractedValue, ok := dataPieceMap[key]; ok {
+						dataSet[j] = extractedValue
+						log.Debug("Good element")
+					} else {
+						log.Debug("Non-conforming element!")
+					}
 				}
 
 				continue outer
 			}
 		}
-		break
+		return errorInvalidPropertyPath(resourceSchema.ID, path)
 	}
 
 	if currProp == nil {
-		return fmt.Errorf("Property under path %s not found in schema %s", path, resourceSchema.ID)
+		return errorInvalidPropertyPath(resourceSchema.ID, path)
 	}
 
 	if currProp.Relation == "" {
 		// Not a relation, so skip
+		log.Debug("Property \"%s\" is not a relation, skipping check", path)
 		return nil
 	}
 
+	log.Debug("Will perform tenant isolation check on %d values", len(dataSet))
 	for _, dataPiece := range dataSet {
 		relatedResourceID, _ := dataPiece.(string)
 		err := validateAttachmentRelation(context, policy, auth, currProp, relatedResourceID)
@@ -1243,6 +1268,7 @@ func validateAttachmentRelation(
 	relatedResourceID string,
 ) error {
 	if relatedResourceID == "" {
+		log.Debug("Skipping tenant isolation check due to empty value")
 		return nil
 	}
 
@@ -1263,6 +1289,9 @@ func validateAttachmentRelation(
 		if policy.IsDeny() {
 			return nil
 		} else {
+			log.Debug("Tenant isolation check failed: resource of ID %s is not visible for tenant \"%s\", domain \"%s\"",
+				relatedResourceID, auth.TenantID(), auth.DomainID(),
+			)
 			return errorBadRequest(relatedSchema.ID, relatedResourceID)
 		}
 	}
@@ -1270,11 +1299,20 @@ func validateAttachmentRelation(
 	err = otherCond.ApplyPropertyConditionFilter(schema.ActionAttach, relatedRes.Data(), nil)
 	if policy.IsDeny() {
 		if err == nil {
+			log.Debug("Tenant isolation check failed: resource of ID %s should have been rejected by condition filter",
+				relatedResourceID,
+			)
 			return errorBadRequest(relatedSchema.ID, relatedResourceID)
 		}
 	} else if err != nil {
+		log.Debug("Tenant isolation check failed: resource of ID %s was rejected by condition filter",
+			relatedResourceID,
+		)
 		return errorNotFound(relatedSchema.ID, relatedResourceID)
 	}
+
+	log.Debug("Tenant isolation check for resource of ID %s was successful", relatedResourceID)
+
 	return nil
 }
 
