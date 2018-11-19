@@ -493,7 +493,7 @@ schemas:
         - create
         - update
         properties:
-          segmentaion_type:
+          segmentation_type:
             enum:
             - vlan
             - vxlan
